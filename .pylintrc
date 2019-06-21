@@ -1,0 +1,14 @@
+[BASIC]
+
+# pylint confuses constants with variables, so regex to cover both
+const-rgx=^([a-z_][a-z0-9_]{2,30}|[A-Z_][A-Z0-9_]{2,30})$
+
+# expect duplicate code, for stand-alone modules
+# might refactor someday
+disable=duplicate-code
+
+# show error msg_id, so I can use it in 'disable' if needed, to save space
+msg-template={msg_id}:{line:3d},{column}: {obj}: {msg}
+
+# need more args in my BAM.__init__
+max-args=7

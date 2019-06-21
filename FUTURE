@@ -1,0 +1,32 @@
+FUTURE PLANS (Roadmap)
+
+Let me know what is important to you!
+
+Read wadl file from bluecat server, and use it to:
+- take arguments without the names
+- figure out the http method automatically
+- Handle start and count automatically
+Together, instead of:
+ ./bam.py getEntities method=get parentId=13098279 type=HostRecord start=0 count=99999
+Just type:
+ ./bam.py getEntities 13098279 HostRecord
+
+Option to save and reuse the login token across multiple calls
+More automated tests
+More error checking and more specific error messages
+More debug options
+Read text or json input from stdin and use the appropriate values as argument "-"
+like:
+bam.py getEntityByName 0 'Main' Configuration | bam.py getEntityByName - 'Default' View
+
+Config file for server, user, and password
+Get defaults for Configuration and View from config file
+
+Recognize IP and MAC Addresses in various formats
+Allow arguments that are id's to optionally be names, and convert automatically
+Select what fields to output, instead of whole objects, if desired
+
+Add common tasks that map to several API calls, like getting a DNS record by FQDN
+
+Sort dictionary items, either alphabetically,
+or in an order that makes sense for BlueCat entities.
