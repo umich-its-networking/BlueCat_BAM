@@ -4,7 +4,7 @@ Let me know what is important to you!
 
 Read wadl file from bluecat server, and use it to:
 - take arguments without the names
-- figure out the http method automatically
+- figure out the http method automatically (partly done)
 - Handle start and count automatically
 Together, instead of:
  ./bam.py getEntities method=get parentId=13098279 type=HostRecord start=0 count=99999
@@ -28,5 +28,5 @@ Select what fields to output, instead of whole objects, if desired
 
 Add common tasks that map to several API calls, like getting a DNS record by FQDN
 
-Sort dictionary items, either alphabetically,
-or in an order that makes sense for BlueCat entities.
+Sort dictionary items so that output is in a consistent order,
+either alphabetically, or in an order that makes sense for BlueCat entities.
