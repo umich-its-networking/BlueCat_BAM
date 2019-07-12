@@ -84,19 +84,13 @@ pip install .
 ```
 If installed as a user, you might need to add "~/.local/bin" to your PATH
 
-## Dev Installation ##
+## Dev Installation in virtualenv ##
 ```
 git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
 cd bluecat_rest_api_python2
 virtualenv venv -p python2
 source ./venv/bin/activate
-pip install --upgrade -e .
-pip install requests
-# for testing:
-pip3 install black
-pip install pylint flake8 pytest bandit
-# for wald2methodlist.py
-pip install xmltodict
+pip install ".[test]"
 ```
 
 If installed as a user, you might need to add "~/.local/bin" to your PATH
