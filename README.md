@@ -17,7 +17,7 @@ Use as a Python module like:
 import json
 import bluecat_bam
 with BAM(server, username, password) as conn:
-    r = conn.do('getEntityByName', method='get', parentId=0, name='admin', type='User')
+    r = conn.do('getEntityByName', parentId=0, name='admin', type='User')
     print(json.dumps(r))
 ```
 Sample output:
@@ -29,13 +29,15 @@ Sample output:
 
 Or use on the command line as a CLI, putting the setup in the environment:
 ```
-cat > mybluecat.env <<EOF
+touch mybluecat.env
+chmod 700 mybluecat.env
+cat >> mybluecat.env <<EOF
 export BLUECAT_SERVER=bluecatservername.domain.example
 export BLUECAT_USERNAME=myusername
 export BLUECAT_PASSWORD=mypassword
 EOF
 source mybluecat.env
-bam getEntityByName method=get parentId=0 name=admin type=User
+bam getEntityByName parentId=0 name=admin type=User
 ```
 Sample output:
 ```
@@ -50,7 +52,7 @@ environment variables.  See help:
 bam -h
 ```
 
-Output can be any of:
+Output from an API call can be any of:
 - JSON dictionary (usually an entity)
 - JSON list of dictionaries (like a list of entities)
 - JSON string (in quotes)
@@ -76,23 +78,30 @@ pip install setuptools
 ## Normal Installation ##
 Download with git as shown, or with curl or wget or web browser
 ```
-git clone git@gitlab.umich.edu:rharolde/bluecat_rest_api_python2.git
+git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
 cd bluecat_rest_api_python2
 pip install .
 ```
 If installed as a user, you might need to add "~/.local/bin" to your PATH
 
-## Dev Installation ##
+## Dev Installation in virtualenv ##
 ```
-git clone git@gitlab.umich.edu:rharolde/bluecat_rest_api_python2.git
+git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
 cd bluecat_rest_api_python2
 virtualenv venv -p python2
 source ./venv/bin/activate
-pip install --upgrade -e .
+pip install ".[test]"
 ```
+
 If installed as a user, you might need to add "~/.local/bin" to your PATH
 
-Written to run under both Python2 and Python3, since the BAM (v8.3.2) has only Python2.  
+See "samples" directory, and also try running quicktest.sh
+.gitlab-ci.yml assumes a gitlab repo, will be different on github.
+
+Written to run under both Python2 and Python3, since the BAM (v9.1.0 and before)
+defaults to Python2.  (BAM 8.2.0 has only Python2)
 Using 'black' to enforce format, line width 88.  
 This passes pylint and flake8 with minor exceptions, see .pylintrc and .flake8  
 Also passes "bandit" security linter.  
+
+See FUTURE for plans to improve this.
