@@ -49,5 +49,6 @@ logger.setLevel(args.logging)
 
 opts = {"timeout": None, "max_retries": 0}
 with bluecat_bam.BAM(args.server, args.username, args.password, **opts) as conn:
-    info = conn.do("getSystemInfo", method="get")
+    # info = conn.do("getSystemInfo", method="get")
+    info = conn.do("getSystemInfo")
     print(json.dumps(info))
