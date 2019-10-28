@@ -73,7 +73,14 @@ class BAM(requests.Session):
 
     # pylint: disable=C0330
     def __init__(
-        self, server, username, password, raw=False, raw_in=False, timeout=None, max_retries=None
+        self,
+        server,
+        username,
+        password,
+        raw=False,
+        raw_in=False,
+        timeout=None,
+        max_retries=None,
     ):
         # pylint: enable=C0330
         """login to BlueCat server API, get token, set header"""

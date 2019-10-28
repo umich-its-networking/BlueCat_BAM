@@ -104,7 +104,8 @@ def main():
     config.add_argument(
         "--raw_in",
         default=os.getenv("BLUECAT_RAW_IN"),
-        help="set to true to not convert input strings from json to 'name-value|...', useful for txt records with json content",
+        help="set to true to not convert input strings from json to "
+        + "'name-value|...', useful for txt records with json content",
     )
     config.add_argument(
         "--version", action="version", version=__progname__ + ".py " + __version__
@@ -156,7 +157,7 @@ def main():
     else:
         args.raw = make_bool(args.raw)
         logging.debug("raw_in made bool")
-    '''
+    """
     isinstance(args.raw, bool):
         pass
     elif args.raw.lower() == "false":
@@ -165,7 +166,7 @@ def main():
         args.raw = True
     else:
         print("ERROR: --raw must be True or False, not: ", args.raw, file=sys.stderr)
-    '''
+    """
     logging.debug("raw_in: %s", args.raw_in)
     if not args.raw_in:
         args.raw_in = False
@@ -174,14 +175,16 @@ def main():
     logging.debug("raw_in: %s", args.raw_in)
 
     # call MAIN
-    with BAM(args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in) as conn:
+    with BAM(
+        args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in
+    ) as conn:
         entity = conn.do(args.command, **params)
         print(json.dumps(entity))
 
 
 def make_bool(var):
+    """make a true/false option into a true boolean type"""
     if isinstance(var, bool):
-        pass
         logging.debug("var already bool %s", var)
     elif var.lower() == "false":
         var = False
@@ -190,7 +193,7 @@ def make_bool(var):
         var = True
         logging.debug("var true")
     else:
-        print("ERROR: %s must be True or False, not: %s" % (var.__name__,var))
+        print("ERROR: %s must be True or False, not: %s" % (var.__name__, var))
     return var
 
 
