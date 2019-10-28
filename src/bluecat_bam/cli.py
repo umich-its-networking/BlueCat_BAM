@@ -165,10 +165,11 @@ def main():
         args.raw_in = make_bool(args.raw_in)
     logging.debug("raw_in: %s", args.raw_in)
 
-    # call MAIN
+    # call MAIN # pylint: disable=C0330
     with BAM(
         args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in
     ) as conn:
+        # pylint: enable=C0330
         entity = conn.do(args.command, **params)
         print(json.dumps(entity))
 
