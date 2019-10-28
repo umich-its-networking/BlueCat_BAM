@@ -11,4 +11,4 @@ disable=duplicate-code
 msg-template={msg_id}:{line:3d},{column}: {obj}: {msg}
 
 # need more args in my BAM.__init__
-max-args=7
+max-args=8

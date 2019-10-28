@@ -35,7 +35,7 @@ config.add_argument(
     default=os.getenv("BLUECAT_PASSWORD"),
     help="password in environment, should not be on command line",
 )
-"""viewId absoluteName txt ttl properties"""
+# arguments: viewId absoluteName txt ttl properties
 config.add_argument("viewId")
 config.add_argument("absoluteName", help="DNS FQDN")
 config.add_argument("txt", help="TXT data")

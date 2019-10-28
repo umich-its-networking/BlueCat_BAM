@@ -68,8 +68,9 @@ except NameError:
     basestring = str  # pylint: disable=invalid-name,redefined-builtin
 
 
-class BAM(requests.Session):
-    """subclass requests and redefine requests.request to a simpler BlueCat interface"""
+class BAM(requests.Session):  # pylint: disable=R0902
+    """subclass requests and
+    redefine requests.request to a simpler BlueCat interface"""
 
     # pylint: disable=C0330
     def __init__(
@@ -154,7 +155,7 @@ class BAM(requests.Session):
         self.get(self.mainurl + "logout?", headers=self.token_header)
 
     def do(self, command, method=None, data=None, **kwargs):
-        # pylint: disable=invalid-name
+        # pylint: disable=invalid-name,R0912
         """run any BlueCat REST API command"""
         # method = kwargs.pop("method")
         # Convert properties from dict-in-string to dict if needed
@@ -214,6 +215,7 @@ class BAM(requests.Session):
         if not self.raw:
             obj = self.convert_response(obj)
         return obj
+        # pylint: enable=invalid-name,R0912
 
     @staticmethod
     def convert_dict_in_str_to_dict(data):

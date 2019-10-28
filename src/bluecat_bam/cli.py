@@ -157,16 +157,7 @@ def main():
     else:
         args.raw = make_bool(args.raw)
         logging.debug("raw_in made bool")
-    """
-    isinstance(args.raw, bool):
-        pass
-    elif args.raw.lower() == "false":
-        args.raw = False
-    elif args.raw.lower() == "true":
-        args.raw = True
-    else:
-        print("ERROR: --raw must be True or False, not: ", args.raw, file=sys.stderr)
-    """
+
     logging.debug("raw_in: %s", args.raw_in)
     if not args.raw_in:
         args.raw_in = False
