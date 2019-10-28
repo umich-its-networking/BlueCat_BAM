@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""addTXTRecord.py viewId absoluteName txt ttl properties"""
+"""add_TXT_record.py viewId absoluteName txt ttl properties"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
@@ -35,22 +35,12 @@ config.add_argument(
     default=os.getenv("BLUECAT_PASSWORD"),
     help="password in environment, should not be on command line",
 )
-'''viewId absoluteName txt ttl properties'''
-config.add_argument(
-    "viewId",
-)
-config.add_argument(
-    "absoluteName", help="DNS FQDN"
-)
-config.add_argument(
-    "txt", help="TXT data"
-)
-config.add_argument(
-    "ttl", help="TTL, use -1 for zone default"
-)
-config.add_argument(
-    "properties", help="properties, in 'name=value|..' format"
-)
+"""viewId absoluteName txt ttl properties"""
+config.add_argument("viewId")
+config.add_argument("absoluteName", help="DNS FQDN")
+config.add_argument("txt", help="TXT data")
+config.add_argument("ttl", help="TTL, use -1 for zone default")
+config.add_argument("properties", help="properties, in 'name=value|..' format")
 config.add_argument(
     "--logging",
     "-l",
@@ -65,12 +55,12 @@ logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
 logger.setLevel(args.logging)
 
 
-'''viewId absoluteName txt ttl properties'''
-'''
+"""viewId absoluteName txt ttl properties"""
+"""
 if not (viewId and absoluteName and txt and ttl and properties):
     config.print_help()
     sys.exit(1)
-'''
+"""
 
 with bluecat_bam.BAM(args.server, args.username, args.password, raw_in=True) as conn:
 
