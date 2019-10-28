@@ -54,13 +54,9 @@ logger = logging.getLogger()
 logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
 logger.setLevel(args.logging)
 
-
-"""viewId absoluteName txt ttl properties"""
-"""
-if not (viewId and absoluteName and txt and ttl and properties):
+if not (args.viewId and args.absoluteName and args.txt and args.ttl):
     config.print_help()
     sys.exit(1)
-"""
 
 with bluecat_bam.BAM(args.server, args.username, args.password, raw_in=True) as conn:
 
