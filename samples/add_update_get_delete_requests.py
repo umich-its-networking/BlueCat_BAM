@@ -76,7 +76,6 @@ resp = conn.request(
 )
 configuration_obj = resp.json()
 # print(json.dumps(configuration_obj))
-# print(configuration_obj)
 
 config_id = configuration_obj["id"]
 print("config_id: {}".format(config_id))
@@ -120,20 +119,15 @@ print()
 print("change name in local copy of the mac address")
 entity["name"] = "testmac"
 print(json.dumps(entity))
-# print(entity)
 print()
 
 print("update the mac address in bluecat, expect null response")
 resp = conn.request(
     url=mainurl + "update" + "?",
     method="put",
-    # data=entity,
-    # json=json.dumps(entity),
     json=entity,
 )
 print(resp)
-print(resp.request.body)
-# logging.info(vars(resp.request))
 print()
 
 print("get mac address from bluecat")
