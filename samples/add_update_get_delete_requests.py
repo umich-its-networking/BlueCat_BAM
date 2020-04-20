@@ -122,11 +122,7 @@ print(json.dumps(entity))
 print()
 
 print("update the mac address in bluecat, expect null response")
-resp = conn.request(
-    url=mainurl + "update" + "?",
-    method="put",
-    json=entity,
-)
+resp = conn.request(url=mainurl + "update" + "?", method="put", json=entity,)
 print(resp)
 print()
 
