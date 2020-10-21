@@ -66,7 +66,7 @@ from bluecat_bam.api import BAM
 
 # double underscore names
 __progname__ = "cli"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 
 def main():

@@ -59,7 +59,7 @@ import requests
 
 # double underscore names
 __progname__ = "api"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 # python2/3 compatability
 try:
