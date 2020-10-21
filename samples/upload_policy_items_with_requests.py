@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
-"""add_update_get_delete_requests.py
+"""upload_policy_items.py
 using only requests package, for testing and comparision"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
 
 import os
-import sys
 import json
 import argparse
 import logging
@@ -53,6 +52,8 @@ config.add_argument(
     + "caution: level DEBUG(10) or less will show the password in the login call",
     default=os.getenv("BLUECAT_LOGGING", "WARNING"),
 )
+config.add_argument("policy_id")
+config.add_argument("filename")
 args = config.parse_args()
 
 
@@ -76,82 +77,42 @@ resp = conn.request(
 )
 configuration_obj = resp.json()
 # print(json.dumps(configuration_obj))
+# print(configuration_obj)
 
 config_id = configuration_obj["id"]
 print("config_id: {}".format(config_id))
 
-print("check if mac address exists, should get id=0 if not")
+
+def upload_response_policy_items(my_token, host, parent_id, filename):
+    """call BlueCat API uploadResponsePolicyItems"""
+    url = "http://{0}/Services/REST/v1/uploadResponsePolicyItems".format(host)
+    headers = {
+        "Authorization": my_token,
+    }
+
+    querystring = {"parentId": parent_id}
+    files = {"data": open(filename, "rb")}
+    my_response = requests.post(url, headers=headers, params=querystring, files=files)
+    return my_response.text
+
+
+response = upload_response_policy_items(
+    token, args.server, args.policy_id, args.filename
+)
+
+print("response: ", response)
+
+
+print("check if policy item exists, should get id=0 if not")
 resp = conn.request(
-    url=mainurl + "getMACAddress" + "?",
+    url=mainurl + "searchResponsePolicyItems" + "?",
     method="get",
-    params={"configurationId": config_id, "macAddress": mac_address},
+    params={"scope": "Local", "keyword": "*", "start": 0, "count": 10},
 )
-oldmac = resp.json()
+items = resp.json()
 
-print("old mac is: ", json.dumps(oldmac))
-mac_id = oldmac["id"]
-print("id: ", mac_id)
-if mac_id != 0:
-    print("ERROR - mac address already exists")
-    sys.exit(1)
-print()
+print("items: ", json.dumps(items))
 
-print("add new mac address, response is the id of the new entity")
-resp = conn.request(
-    url=mainurl + "addMACAddress" + "?",
-    method="post",
-    params={"configurationId": config_id, "macAddress": mac_address, "properties": ""},
-)
-mac_id = resp.json()
-print("new id is: ", mac_id)
-print()
-
-print("get mac address just added")
-resp = conn.request(
-    url=mainurl + "getMACAddress" + "?",
-    method="get",
-    params={"configurationId": config_id, "macAddress": mac_address},
-)
-entity = resp.json()
-print(json.dumps(entity))
-print()
-
-print("change name in local copy of the mac address")
-entity["name"] = "testmac"
-print(json.dumps(entity))
-print()
-
-print("update the mac address in bluecat, expect null response")
-resp = conn.request(url=mainurl + "update" + "?", method="put", json=entity)
-print(resp)
-print()
-
-print("get mac address from bluecat")
-resp = conn.request(
-    url=mainurl + "getMACAddress" + "?",
-    method="get",
-    params={"configurationId": config_id, "macAddress": mac_address},
-)
-entity = resp.json()
-print(json.dumps(entity))
-print()
-
-print("delete mac address, expect null response")
-resp = conn.request(
-    url=mainurl + "delete" + "?", method="delete", params={"objectId": mac_id}
-)
-print(resp)
-print()
-
-print("check if mac address exists, should get id=0")
-resp = conn.request(
-    url=mainurl + "getMACAddress" + "?",
-    method="get",
-    params={"configurationId": config_id, "macAddress": mac_address},
-)
-entity = resp.json()
-print(json.dumps(entity))
-print()
 
 print("logout")
 resp = conn.request(url=mainurl + "logout" + "?", method="get")

@@ -71,11 +71,9 @@ except NameError:
 class BAM(requests.Session):
     """subclass requests and redefine requests.request to a simpler BlueCat interface"""
 
-    # pylint: disable=C0330
     def __init__(
         self, server, username, password, raw=False, timeout=None, max_retries=None
     ):
-        # pylint: enable=C0330
         """login to BlueCat server API, get token, set header"""
         self.username = username
         self.password = password
@@ -165,6 +163,7 @@ class BAM(requests.Session):
         data = self.convert_data(data)  # Convert data if needed
         try:
             properties = kwargs.pop("properties")
+            logging.debug("properties before conversion: %s", properties)
             properties = self.convert_dict_in_str_to_dict(properties)
             kwargs["properties"] = self.convert_dict_to_str(properties)
             logging.debug("properties converted: %s", properties)
@@ -172,8 +171,10 @@ class BAM(requests.Session):
             logging.debug("no properties")
         try:
             overrides = kwargs.pop("overrides")
+            logging.debug("overrides before conversion: %s", overrides)
             overrides = self.convert_dict_in_str_to_dict(overrides)
             kwargs["overrides"] = self.convert_dict_to_str(overrides)
+            logging.debug("overrides converted: %s", overrides)
         except KeyError:
             pass
         response = self.request(
@@ -207,8 +208,11 @@ class BAM(requests.Session):
     def convert_dict_in_str_to_dict(data):
         """data, properties, and overrides can be dict, but passed as json string,
         especially from cli"""
-        if data and isinstance(data, basestring):
-            data = json.loads(data)
+        if data and isinstance(data, basestring) and data[0] == "{":
+            try:
+                data = json.loads(data)
+            except ValueError:
+                print("Failed to convert data '%s' from string to dict" % (data))
         return data
 
     # @staticmethod

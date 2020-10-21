@@ -62,6 +62,7 @@ import sys
 import logging
 import json
 import argparse
+import configparser
 from bluecat_bam.api import BAM
 
 # double underscore names
@@ -120,6 +121,16 @@ def main():
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
+
+    cfg = configparser.ConfigParser()
+    cfg.read("bluecat_login_credentials")
+    bam_args = {
+        "username": cfg["account"]["username"],
+        "password": cfg["account"]["password"],
+        "server": cfg["account"]["server"],
+    }
+    print(bam_args)
+    # with bluecat_bam.BAM(**bam_args) as conn:
 
     # should use a 'comprehension' ?? ***
     params = {}  # create the params dictionary
