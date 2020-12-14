@@ -26,7 +26,7 @@ pylint-py27:
   image: python:2.7-jessie
   stage: code-quality
   before_script:
-    - pip install pylint pytest requests xmltodict
+    - pip install pylint pytest requests xmltodict ipaddress
     - pip install .
   script:
     - pylint $files
