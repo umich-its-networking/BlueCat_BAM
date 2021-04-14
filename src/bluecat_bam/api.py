@@ -72,7 +72,6 @@ class BAM(requests.Session):  # pylint: disable=R0902
     """subclass requests and
     redefine requests.request to a simpler BlueCat interface"""
 
-    # pylint: disable=C0330
     def __init__(
         self,
         server,
@@ -83,7 +82,6 @@ class BAM(requests.Session):  # pylint: disable=R0902
         timeout=None,
         max_retries=None,
     ):
-        # pylint: enable=C0330
         """login to BlueCat server API, get token, set header"""
         self.username = username
         self.password = password
