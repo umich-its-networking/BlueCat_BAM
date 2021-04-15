@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 
-"""getSystemInfo.py"""
+"""getwald.py"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
 
 import os
-import json
 import argparse
 import logging
 
 import bluecat_bam
 
 
-config = argparse.ArgumentParser(description="add next dhcp reserved")
+config = argparse.ArgumentParser(description="get wadl file")
 config.add_argument(
     "--server",
     "-s",
@@ -49,5 +48,7 @@ logger.setLevel(args.logging)
 
 opts = {"timeout": None, "max_retries": 0}
 with bluecat_bam.BAM(args.server, args.username, args.password, **opts) as conn:
-    info = conn.do("getSystemInfo", method="get")
-    print(json.dumps(info))
+    info = conn.request(
+        "GET", "https://" + args.server + "/Services/REST/application.wadl"
+    )
+    print(info.text)

@@ -62,6 +62,7 @@ import sys
 import logging
 import json
 import argparse
+import configparser
 from bluecat_bam.api import BAM
 
 # double underscore names
@@ -102,19 +103,13 @@ def main():
         + "to dictionaries on output.  Will accept either format on input.",
     )
     config.add_argument(
-        "--raw_in",
-        default=os.getenv("BLUECAT_RAW_IN"),
-        help="set to true to not convert input strings from json to "
-        + "'name-value|...', useful for txt records with json content",
-    )
-    config.add_argument(
         "--version", action="version", version=__progname__ + ".py " + __version__
     )
     config.add_argument(
         "--logging",
         "-l",
         help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or lower will show the password in the login call",
+        + "caution: level DEBUG(10) or less will show the password in the login call",
         default=os.getenv("BLUECAT_LOGGING", "WARNING"),
     )
     config.add_argument(
@@ -126,6 +121,16 @@ def main():
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
+
+    cfg = configparser.ConfigParser()
+    cfg.read("bluecat_login_credentials")
+    bam_args = {
+        "username": cfg["account"]["username"],
+        "password": cfg["account"]["password"],
+        "server": cfg["account"]["server"],
+    }
+    print(bam_args)
+    # with bluecat_bam.BAM(**bam_args) as conn:
 
     # should use a 'comprehension' ?? ***
     params = {}  # create the params dictionary
@@ -150,45 +155,24 @@ def main():
         # config.print_help()  # printing full help on every mistake is too much
         # raise ValueError  # stacktrace here is not useful
         sys.exit(2)
-    logging.debug("raw: %s", args.raw)
     if not args.raw:
         args.raw = False
-        logging.debug("raw_in changed to False")
+    elif isinstance(args.raw, bool):
+        pass
+    elif args.raw.lower() == "false":
+        args.raw = False
+    elif args.raw.lower() == "true":
+        args.raw = True
     else:
-        args.raw = make_bool(args.raw)
-        logging.debug("raw_in made bool")
-
-    logging.debug("raw_in: %s", args.raw_in)
-    if not args.raw_in:
-        args.raw_in = False
-    else:
-        args.raw_in = make_bool(args.raw_in)
-    logging.debug("raw_in: %s", args.raw_in)
+        print("ERROR: --raw must be True or False, not: ", args.raw, file=sys.stderr)
 
     # call MAIN
-    with BAM(
-        args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in
-    ) as conn:
+    with BAM(args.server, args.username, args.password, raw=args.raw) as conn:
         entity = conn.do(args.command, **params)
         try:
             print(json.dumps(entity))
         except ValueError:
             print("Failed to convert to json: %s" % (entity))
-
-
-def make_bool(var):
-    """make a true/false option into a true boolean type"""
-    if isinstance(var, bool):
-        logging.debug("var already bool %s", var)
-    elif var.lower() == "false":
-        var = False
-        logging.debug("var false")
-    elif var.lower() == "true":
-        var = True
-        logging.debug("var true")
-    else:
-        print("ERROR: %s must be True or False, not: %s" % (var.__name__, var))
-    return var
 
 
 if __name__ == "__main__":
