@@ -68,11 +68,19 @@ except NameError:
     basestring = str  # pylint: disable=invalid-name,redefined-builtin
 
 
-class BAM(requests.Session):
-    """subclass requests and redefine requests.request to a simpler BlueCat interface"""
+class BAM(requests.Session):  # pylint: disable=R0902
+    """subclass requests and
+    redefine requests.request to a simpler BlueCat interface"""
 
     def __init__(
-        self, server, username, password, raw=False, timeout=None, max_retries=None
+        self,
+        server,
+        username,
+        password,
+        raw=False,
+        raw_in=False,
+        timeout=None,
+        max_retries=None,
     ):
         """login to BlueCat server API, get token, set header"""
         self.username = username
@@ -80,6 +88,8 @@ class BAM(requests.Session):
         self.timeout = timeout
         self.raw = bool(raw)
         logging.info("raw: %s", self.raw)
+        self.raw_in = bool(raw_in)
+        logging.info("raw_in: %s", self.raw_in)
         if not (server and username and password):
             print("server, username, and password are required.\n")
             raise requests.RequestException
@@ -143,7 +153,7 @@ class BAM(requests.Session):
         self.get(self.mainurl + "logout?", headers=self.token_header)
 
     def do(self, command, method=None, data=None, **kwargs):
-        # pylint: disable=invalid-name
+        # pylint: disable=invalid-name,R0912
         """run any BlueCat REST API command"""
         # method = kwargs.pop("method")
         # Convert properties from dict-in-string to dict if needed
@@ -160,21 +170,21 @@ class BAM(requests.Session):
                 data = body
         except KeyError:
             pass
-        data = self.convert_data(data)  # Convert data if needed
+        if not self.raw_in:
+            data = self.convert_data(data)  # Convert data if needed
         try:
-            properties = kwargs.pop("properties")
-            logging.debug("properties before conversion: %s", properties)
-            properties = self.convert_dict_in_str_to_dict(properties)
-            kwargs["properties"] = self.convert_dict_to_str(properties)
+            properties = kwargs.get("properties")
+            if not self.raw_in:
+                properties = self.convert_dict_in_str_to_dict(properties)
+                kwargs["properties"] = self.convert_dict_to_str(properties)
             logging.debug("properties converted: %s", properties)
         except KeyError:
             logging.debug("no properties")
         try:
-            overrides = kwargs.pop("overrides")
-            logging.debug("overrides before conversion: %s", overrides)
-            overrides = self.convert_dict_in_str_to_dict(overrides)
-            kwargs["overrides"] = self.convert_dict_to_str(overrides)
-            logging.debug("overrides converted: %s", overrides)
+            overrides = kwargs.get("overrides")
+            if not self.raw_in:
+                overrides = self.convert_dict_in_str_to_dict(overrides)
+                kwargs["overrides"] = self.convert_dict_to_str(overrides)
         except KeyError:
             pass
         response = self.request(
@@ -203,6 +213,7 @@ class BAM(requests.Session):
         if not self.raw:
             obj = self.convert_response(obj)
         return obj
+        # pylint: enable=invalid-name,R0912
 
     @staticmethod
     def convert_dict_in_str_to_dict(data):
