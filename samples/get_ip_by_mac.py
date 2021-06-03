@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""get_fqdn.py config view type domain_name"""
+"""get_ip_by_mac.py mac-address"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
@@ -14,7 +14,8 @@ import logging
 import bluecat_bam
 
 
-config = argparse.ArgumentParser(description="get fqdn")
+config = argparse.ArgumentParser(description="get ip by mac address")
+config.add_argument("mac", help="MAC Address")
 config.add_argument(
     "--server",
     "-s",
@@ -42,16 +43,15 @@ config.add_argument(
     default=os.getenv("BLUECAT_CONFIGURATION"),
 )
 config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW"))
-config.add_argument("--type", help="DNS record type", default="HostRecord")
-config.add_argument(
-    "--host", "--hostname", "--fqdn", "--dns", "-d", help="DNS domain name or hostname"
-)
 config.add_argument(
     "--logging",
     "-l",
     help="log level, default WARNING (30),"
     + "caution: level DEBUG(10) or less will show the password in the login call",
     default=os.getenv("BLUECAT_LOGGING", "WARNING"),
+)
+config.add_argument(
+    "--ipexpire", help="just show IP and expire date", action="store_true"
 )
 args = config.parse_args()
 
@@ -61,10 +61,10 @@ logger.setLevel(args.logging)
 
 configuration_name = args.configuration
 view_name = args.view
-record_type = args.type
-domain_name = args.host
+mac = args.mac
+ipexpire = args.ipexpire
 
-if not (configuration_name and view_name and record_type and domain_name):
+if not (configuration_name and view_name and mac):
     config.print_help()
     sys.exit(1)
 
@@ -80,6 +80,7 @@ configuration_obj = conn.do(
 
 configuration_id = configuration_obj["id"]
 
+"""
 view_obj = conn.do(
     "getEntityByName",
     method="get",
@@ -88,45 +89,26 @@ view_obj = conn.do(
     type="View",
 )
 view_id = view_obj["id"]
+"""
 
-domain_label_list = domain_name.split(".")
+mac_obj = conn.do("getMACAddress", method="get", configurationId=557057, macAddress=mac)
+mac_id = mac_obj["id"]
 
-search_domain = domain_label_list.pop()
-current_domain = ""
-parent_id = view_id
+ip_obj_list = conn.do(
+    "getLinkedEntities", entityId=mac_id, type="IP4Address", start=0, count=9999
+)
 
-while True:
-    zone = conn.do(
-        "getEntityByName",
-        method="get",
-        parentId=parent_id,
-        name=search_domain,
-        type="Zone",
-    )
-    if zone.get("id") == 0:  # do not change parent_id if zero
-        break
-    parent_id = zone.get("id")
-    current_domain = zone.get("name") + "." + current_domain
-    # print(json.dumps(domain_label_list))
-    if domain_label_list:
-        search_domain = domain_label_list.pop()
-    else:
-        search_domain = ""
-        break
-
-if record_type.lower() == "zone":
-    entities = [zone]
+if ipexpire:
+    out = mac
+    for ip_obj in ip_obj_list:
+        out = (
+            out
+            + " "
+            + ip_obj["properties"]["address"]
+            + " "
+            + ip_obj["properties"]["expiryTime"]
+        )
+    print(out)
 else:
-    entities = conn.do(
-        "getEntitiesByName",
-        method="get",
-        parentId=parent_id,
-        name=search_domain,
-        type=record_type,
-        start=0,
-        count=1000,
-    )
-for entity in entities:
-    print(json.dumps(entity))
-
-conn.logout()
+    print(json.dumps(mac_obj))
+    print(json.dumps(ip_obj_list))

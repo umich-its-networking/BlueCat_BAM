@@ -59,7 +59,7 @@ import requests
 
 # double underscore names
 __progname__ = "api"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 # python2/3 compatability
 try:
@@ -219,8 +219,11 @@ class BAM(requests.Session):  # pylint: disable=R0902
     def convert_dict_in_str_to_dict(data):
         """data, properties, and overrides can be dict, but passed as json string,
         especially from cli"""
-        if data and isinstance(data, basestring):
-            data = json.loads(data)
+        if data and isinstance(data, basestring) and data[0] == "{":
+            try:
+                data = json.loads(data)
+            except ValueError:
+                print("Failed to convert data '%s' from string to dict" % (data))
         return data
 
     # @staticmethod
