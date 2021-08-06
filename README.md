@@ -79,7 +79,8 @@ pip install setuptools
 Download with git as shown, or with curl or wget or web browser
 ```
 git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
-cd bluecat_rest_api_python2
+cd bluecat_bam
+pip install wheel
 pip install .
 ```
 If installed as a user, you might need to add "~/.local/bin" to your PATH
@@ -87,10 +88,11 @@ If installed as a user, you might need to add "~/.local/bin" to your PATH
 ## Dev Installation in virtualenv ##
 ```
 git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
-cd bluecat_rest_api_python2
-virtualenv venv -p python2
+cd bluecat_bam
+python3 -m venv venv
 source ./venv/bin/activate
-pip install ".[test]"
+pip install wheel
+pip install -e ".[test]"
 ```
 
 If installed as a user, you might need to add "~/.local/bin" to your PATH
@@ -100,6 +102,8 @@ See "samples" directory, and also try running quicktest.sh
 
 Written to run under both Python2 and Python3, since the BAM (v9.1.0 and before)
 defaults to Python2.  (BAM 8.2.0 has only Python2)
+(Removed python2 tests because new versions of Python2 fail for unknown reasons.
+  But it should still work on a BAM.)
 Using 'black' to enforce format, line width 88.  
 This passes pylint and flake8 with minor exceptions, see .pylintrc and .flake8  
 Also passes "bandit" security linter.  
