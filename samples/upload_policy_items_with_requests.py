@@ -91,8 +91,11 @@ def upload_response_policy_items(my_token, host, parent_id, filename):
     }
 
     querystring = {"parentId": parent_id}
-    files = {"data": open(filename, "rb")}
-    my_response = requests.post(url, headers=headers, params=querystring, files=files)
+    with open(filename, "rb") as f:
+        files = {"data": f}
+        my_response = requests.post(
+            url, headers=headers, params=querystring, files=files
+        )
     return my_response.text
 
 
