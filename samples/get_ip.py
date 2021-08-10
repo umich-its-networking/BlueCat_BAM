@@ -87,7 +87,8 @@ view_obj = conn.do(
 view_id = view_obj["id"]
 """
 
-ip_obj = conn.do("getIP4Address", method="get", containerId=configuration_id, address=ip)
-##ip_id = ip_obj["id"]
+ip_obj = conn.do(
+    "getIP4Address", method="get", containerId=configuration_id, address=ip
+)
 
 print(json.dumps(ip_obj))
