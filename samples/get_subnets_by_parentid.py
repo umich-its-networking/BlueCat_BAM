@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""get_subnets.py config view type domain_name"""
+"""get_subnets_by_parentid.py config view type domain_name"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
