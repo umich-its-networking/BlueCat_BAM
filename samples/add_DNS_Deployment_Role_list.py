@@ -2,8 +2,10 @@
 
 """
 add_DNS_Deployment_Role_list.py list-of-DNSservername-and-role
-[--cfg configuration] [--view viewname]
+[--cfg configuration] [--view viewname] serverlist
 < list-of-CIDR-or-zonename
+
+"serverlist"="file with servername and DNS role on each line"
 """
 
 # to be python2/3 compatible:
@@ -27,6 +29,7 @@ def argparsecommon():
     """set up common argparse arguments for BlueCat API"""
     config = argparse.ArgumentParser(
         description="BlueCat Address Manager add_DNS_Deployment_Role_list"
+        + " - feed list of CIDR or zonename to stdin"
     )
     config.add_argument(
         "--server",
