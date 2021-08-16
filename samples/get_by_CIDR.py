@@ -85,25 +85,13 @@ configuration_obj = conn.do(
 configuration_id = configuration_obj["id"]
 logging.info("Configuration id = %s", configuration_id)
 
-"""
-view_obj = conn.do(
-    "getEntityByName",
-    method="get",
-    parentId=configuration_id,
-    name=view_name,
-    type="View",
-)
-view_id = view_obj["id"]
-"""
-
-id = -1
 ip, prefix = cidr.split("/")
 obj = conn.do(
     "getIPRangedByIP", method="get", containerId=configuration_id, address=ip, type=""
 )
-id = obj["id"]
+obj_id = obj["id"]
 logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
-if id == 0:
+if obj_id == 0:
     print("Not found")
     ranged = False
 else:
@@ -114,7 +102,7 @@ else:
 # So check for a matching Network.
 if ranged and obj["type"] == "IP4Block":
     network_obj = conn.do(
-        "getEntityByCIDR", method="get", cidr=cidr, parentId=id, type="IP4Network"
+        "getEntityByCIDR", method="get", cidr=cidr, parentId=obj_id, type="IP4Network"
     )
     if network_obj["id"]:
         obj = network_obj
