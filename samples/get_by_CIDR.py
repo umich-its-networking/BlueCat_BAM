@@ -15,7 +15,9 @@ import re
 import bluecat_bam
 
 
-config = argparse.ArgumentParser(description="get network and/or block by CIDR")
+config = argparse.ArgumentParser(
+    description="get network, block, or both matching the CIDR"
+)
 config.add_argument("cidr", help="CIDR Address/prefix")
 config.add_argument(
     "--server",
@@ -65,7 +67,7 @@ if not (configuration_name and view_name and cidr):
     config.print_help()
     sys.exit(1)
 
-match=re.fullmatch(r'(\d{1,3}\.){3}\d{1,3}/\d{1,2}',cidr)
+match = re.fullmatch(r"(\d{1,3}\.){3}\d{1,3}/\d{1,2}", cidr)
 if not match:
     config.print_help()
     sys.exit(1)
@@ -94,33 +96,40 @@ view_obj = conn.do(
 view_id = view_obj["id"]
 """
 
-id=-1
-ip, prefix = cidr.split('/')
+id = -1
+ip, prefix = cidr.split("/")
 obj = conn.do(
-    "getIPRangedByIP", method="get", containerId=configuration_id, address=ip, type=''
+    "getIPRangedByIP", method="get", containerId=configuration_id, address=ip, type=""
 )
-id=obj['id']
+id = obj["id"]
 logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
 if id == 0:
     print("Not found")
-    ranged=False
+    ranged = False
 else:
-    ranged=True
+    ranged = True
 
-while ranged:   # always True or always False, this is a loop - until
+# bug in BlueCat - if Block and Network have the same CIDR,
+# it should return the Network, but it returns the Block.
+# So check for a matching Network.
+if ranged and obj["type"] == "IP4Block":
+    network_obj = conn.do(
+        "getEntityByCIDR", method="get", cidr=cidr, parentId=id, type="IP4Network"
+    )
+    if network_obj["id"]:
+        obj = network_obj
+
+while ranged:  # always True or always False, this is a loop - until
     # network and block have CIDR, DHCP range does not
-    found_cidr=obj['properties'].get('CIDR')
+    found_cidr = obj["properties"].get("CIDR")
     if found_cidr:
-        found_ip, found_prefix = found_cidr.split('/')
+        found_ip, found_prefix = found_cidr.split("/")
         if found_ip == ip and found_prefix == prefix:
             print(json.dumps(obj))
         if found_ip != ip or int(found_prefix) < int(prefix):
             break
     # walk up the tree
-    obj = conn.do(
-        "getParent", method="get", entityId=obj['id']
-    )
+    obj = conn.do("getParent", method="get", entityId=obj["id"])
     logging.info("parent obj = %s", json.dumps(obj))
 
-
-#print(json.dumps(ip_obj))
+# print(json.dumps(ip_obj))
