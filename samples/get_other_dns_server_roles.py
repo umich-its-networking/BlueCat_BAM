@@ -80,17 +80,12 @@ def argparsecommon():
     return config
 
 
-def getdnsservers(conn,configuration_id):
+def getdnsservers(conn, configuration_id):
     """get list of DNS Server objects"""
     dns_server_obj_list = conn.do(
-        "getEntities",
-        count=1000,
-        start=0,
-        parentId=configuration_id,
-        type='Server'
+        "getEntities", count=1000, start=0, parentId=configuration_id, type="Server"
     )
     return dns_server_obj_list
-
 
 
 def readserverlist(serverlistfile, conn, configuration_id):
@@ -319,8 +314,8 @@ def main():
     config.add_argument(
         "--exclude",
         "-x",
-	nargs="*",
-        action='append',
+        nargs="*",
+        action="append",
         help="server display names or hostnames to exclude, space separated",
     )
 
@@ -354,35 +349,71 @@ def main():
         )
         view_id = view_obj["id"]
 
-
-        dns_server_obj_list = getdnsservers(conn,configuration_id)
-        #for s in dns_server_obj_list:
+        dns_server_obj_list = getdnsservers(conn, configuration_id)
+        # for s in dns_server_obj_list:
         #    print(s)
-        other_dns_obj_list = [ o for o in dns_server_obj_list if o['properties']['profile'] == "OTHER_DNS_SERVER" ]
-        final_dns_obj_list = [ o for o in other_dns_obj_list if o['name'] not in exclude_list and o['properties']['fullHostName'] not in exclude_list ]
+        other_dns_obj_list = [
+            o
+            for o in dns_server_obj_list
+            if o["properties"]["profile"] == "OTHER_DNS_SERVER"
+        ]
+        final_dns_obj_list = [
+            o
+            for o in other_dns_obj_list
+            if o["name"] not in exclude_list
+            and o["properties"]["fullHostName"] not in exclude_list
+        ]
 
         for server in final_dns_obj_list:
-            prop = server['properties']
-            roles = conn.do(
-                "getServerDeploymentRoles",
-                serverId=server['id']
-            )
+            prop = server["properties"]
+            roles = conn.do("getServerDeploymentRoles", serverId=server["id"])
             for role in roles:
-                entity = conn.do(
-                    "getEntityById",
-                    id=role['entityId']
-                )
+                entity = conn.do("getEntityById", id=role["entityId"])
                 print(entity)
-                if entity['type'] in ( 'Zone' ):
-                    print(server['name'],prop['fullHostName'],prop['defaultInterfaceAddress'],role['type'],entity['type'],entity['properties']['absoluteName'])
-                elif entity['type'] in ( 'EnumZone' ):
-                    print(server['name'],prop['fullHostName'],prop['defaultInterfaceAddress'],role['type'],entity)
-                elif entity['type'] in ( 'IP4Network', 'IP4Block' ):
-                    print(server['name'],prop['fullHostName'],prop['defaultInterfaceAddress'],role['type'],entity['type'],entity['properties']['CIDR'])
-                elif entity['type'] in ( 'IP6Network', 'IP6Block' ):
-                    print(server['name'],prop['fullHostName'],prop['defaultInterfaceAddress'],role['type'],entity['type'],entity['properties']['prefix'])
+                if entity["type"] in ("Zone"):
+                    print(
+                        server["name"],
+                        prop["fullHostName"],
+                        prop["defaultInterfaceAddress"],
+                        role["type"],
+                        entity["type"],
+                        entity["properties"]["absoluteName"],
+                    )
+                elif entity["type"] in ("EnumZone"):
+                    print(
+                        server["name"],
+                        prop["fullHostName"],
+                        prop["defaultInterfaceAddress"],
+                        role["type"],
+                        entity,
+                    )
+                elif entity["type"] in ("IP4Network", "IP4Block"):
+                    print(
+                        server["name"],
+                        prop["fullHostName"],
+                        prop["defaultInterfaceAddress"],
+                        role["type"],
+                        entity["type"],
+                        entity["properties"]["CIDR"],
+                    )
+                elif entity["type"] in ("IP6Network", "IP6Block"):
+                    print(
+                        server["name"],
+                        prop["fullHostName"],
+                        prop["defaultInterfaceAddress"],
+                        role["type"],
+                        entity["type"],
+                        entity["properties"]["prefix"],
+                    )
                 else:
-                    print(server['name'],prop['fullHostName'],prop['defaultInterfaceAddress'],role['type'],entity['type'],"unknown-type")
+                    print(
+                        server["name"],
+                        prop["fullHostName"],
+                        prop["defaultInterfaceAddress"],
+                        role["type"],
+                        entity["type"],
+                        "unknown-type",
+                    )
 
 
 if __name__ == "__main__":
