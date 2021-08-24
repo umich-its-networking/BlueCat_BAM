@@ -9,9 +9,8 @@ include-naming-hint=y
 
 # expect duplicate code, for stand-alone modules
 # might refactor someday
-disable=duplicate-code,C0330
-# unnecessary - wants encoding specified on every 'open'
-disable=W1514
+disable=duplicate-code,C0330,W1514
+# W1514 unnecessary - wants encoding specified on every 'open'
 
 # show error msg_id, so I can use it in 'disable' if needed, to save space
 msg-template={msg_id}:{line:3d},{column}: {obj}: {msg}
