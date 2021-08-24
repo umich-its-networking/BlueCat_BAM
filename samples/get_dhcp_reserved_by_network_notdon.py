@@ -78,9 +78,12 @@ def argparsecommon():
 
 
 def get_dhcp_reserved(networkid, conn):
+    """get list of entities"""
     ip_list = conn.do(
         "getEntities",
+        parentId=networkid,
     )
+    return ip_list
 
 
 def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
@@ -283,7 +286,7 @@ def main():
                 if not entity:
                     print("network not found", line)
                     continue
-                # print("found entity", json.dumps(entity))
+                logger.debug("found entity %s", json.dumps(entity))
 
             else:  # no cidr, so a zone name
                 zone_name = line
@@ -299,7 +302,7 @@ def main():
                 continue
 
             # found entityId
-            entityId = entity["id"]
+            # entityId = entity["id"]
 
 
 if __name__ == "__main__":

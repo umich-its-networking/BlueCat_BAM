@@ -167,39 +167,6 @@ def readserverlist(serverlistfile, conn, configuration_id):
     return interface_list
 
 
-def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
-    """found entityId that needs DNS roles, now add them"""
-    print("add interfaces to zone", zone_name)
-    properties = "view=" + str(view_id) + "|"
-    for (interfaceid, role, server_name) in interface_list:
-        role_obj = conn.do(
-            "getDNSDeploymentRole",
-            entityId=entityId,
-            serverInterfaceId=interfaceid,
-        )
-        if role_obj["id"] == 0:
-            roleid = conn.do(
-                "addDNSDeploymentRole",
-                method="post",
-                entityId=entityId,
-                serverInterfaceId=interfaceid,
-                type=role,
-                properties=properties,
-            )
-            print(zone_name, role, server_name, roleid)
-        else:
-            if role_obj["type"] == role:
-                print(zone_name, role, server_name, "role exists")
-            else:
-                print(
-                    zone_name,
-                    role,
-                    server_name,
-                    "existing role is ",
-                    role_obj["type"],
-                )
-
-
 def zonename2cidr(zone_name):
     """convert zone name (...in-addr.arpa) to cidr for class A,B,C"""
     parts = zone_name.split(".")
@@ -274,40 +241,6 @@ def get_network(cidr, configuration_id, conn):
     return entity
 
 
-def get_zone(zone_name, view_id, conn):
-    """get zone object given zone name"""
-    # search if zone exists
-    domain_label_list = zone_name.split(".")
-
-    search_domain = domain_label_list.pop()
-    current_domain = ""
-    parent_id = view_id
-
-    while True:
-        zone = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=parent_id,
-            name=search_domain,
-            type="Zone",
-        )
-        if zone.get("id") == 0:  # do not change parent_id if zero
-            break
-        parent_id = zone.get("id")
-        current_domain = zone.get("name") + "." + current_domain
-        # print(json.dumps(domain_label_list))
-        if domain_label_list:
-            search_domain = domain_label_list.pop()
-        else:
-            search_domain = ""
-            break
-
-    if current_domain == zone_name + ".":
-        # print("found zone", json.dumps(zone))
-        return zone
-    return {}
-
-
 def main():
     """get_other_dns_server_roles.py"""
     config = argparsecommon()
@@ -326,7 +259,6 @@ def main():
     logger.setLevel(args.logging)
 
     configuration_name = args.configuration
-    view_name = args.view
     exclude_list = args.exclude
     print(exclude_list)
 
@@ -339,15 +271,6 @@ def main():
             type="Configuration",
         )
         configuration_id = configuration_obj["id"]
-
-        view_obj = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=configuration_id,
-            name=view_name,
-            type="View",
-        )
-        view_id = view_obj["id"]
 
         dns_server_obj_list = getdnsservers(conn, configuration_id)
         # for s in dns_server_obj_list:
@@ -370,7 +293,7 @@ def main():
             for role in roles:
                 entity = conn.do("getEntityById", id=role["entityId"])
                 print(entity)
-                if entity["type"] in ("Zone"):
+                if entity["type"] in ("Zone"):  # pylint: disable=C0325
                     print(
                         server["name"],
                         prop["fullHostName"],
@@ -379,7 +302,7 @@ def main():
                         entity["type"],
                         entity["properties"]["absoluteName"],
                     )
-                elif entity["type"] in ("EnumZone"):
+                elif entity["type"] in ("EnumZone"):  # pylint: disable=C0325
                     print(
                         server["name"],
                         prop["fullHostName"],
@@ -388,14 +311,17 @@ def main():
                         entity,
                     )
                 elif entity["type"] in ("IP4Network", "IP4Block"):
-                    print(
-                        server["name"],
-                        prop["fullHostName"],
-                        prop["defaultInterfaceAddress"],
-                        role["type"],
-                        entity["type"],
-                        entity["properties"]["CIDR"],
-                    )
+                    if entity["properties"].get("CIDR"):
+                        print(
+                            server["name"],
+                            prop["fullHostName"],
+                            prop["defaultInterfaceAddress"],
+                            role["type"],
+                            entity["type"],
+                            entity["properties"]["CIDR"],
+                        )
+                    else:  # start/end instead of cidr
+                        print("xxx")
                 elif entity["type"] in ("IP6Network", "IP6Block"):
                     print(
                         server["name"],
