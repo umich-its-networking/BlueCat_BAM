@@ -4,8 +4,9 @@
 add_DHCP_deployment_option.py entity optionname optionvalue --properties properties
 """
 
-# samples/add_DHCP_deployment_option.py 8246503 vendor-encapsulated-options F1:04:8D:D5:98:4B
-# {"id": 22348235, "type": "DHCPClient", "name": "vendor-encapsulated-options", "value": "F1:04:8D:D5:98:4B", "properties": {"inherited": "false"}}
+# add_DHCP_deployment_option.py 8246503 vendor-encapsulated-options F1:04:8D:D5:98:4B
+# {"id": 22348235, "type": "DHCPClient", "name": "vendor-encapsulated-options",
+# "value": "F1:04:8D:D5:98:4B", "properties": {"inherited": "false"}}
 
 # to be python2/3 compatible:
 from __future__ import print_function
@@ -73,6 +74,7 @@ def argparsecommon():
     )
     return config
 
+
 def getserverid(server_name, configuration_id, conn):
     """get server id, given the server domainname or displayname"""
     # try by the server displayname
@@ -84,12 +86,15 @@ def getserverid(server_name, configuration_id, conn):
         count=2,  # error if more than one
     )
     if len(interface_obj_list) > 1:
-        print("ERROR - more than one server interface found", json.dumps(interface_obj_list))
+        print(
+            "ERROR - more than one server interface found",
+            json.dumps(interface_obj_list),
+        )
         sys.exit(3)
     interfaceid = interface_obj_list[0]["id"]
     if interfaceid != 0:
-        obj=conn.do("getParent", entityId=interfaceid)
-        return obj['id']
+        obj = conn.do("getParent", entityId=interfaceid)
+        return obj["id"]
     # server not found by domanname
     # try by the server display name
     server_obj_list = conn.do(
@@ -116,6 +121,7 @@ def getserverid(server_name, configuration_id, conn):
         print("ERROR - server not found for name", server_name)
         sys.exit(1)
     return server_id
+
 
 def getinterfaceid(server_name, configuration_id, conn):
     """get server interface id, given the server domainname or displayname"""
@@ -185,8 +191,12 @@ def main():
     # cannot use None as a default value
     config.add_argument("optionname")
     config.add_argument("optionvalue")
-    config.add_argument("--dhcpserver",help="name of DHCP server, if option only applies to one server")
-    config.add_argument("--properties",help='other properties as a JSON dict "{name: value}"')
+    config.add_argument(
+        "--dhcpserver", help="name of DHCP server, if option only applies to one server"
+    )
+    config.add_argument(
+        "--properties", help='other properties as a JSON dict "{name: value}"'
+    )
 
     args = config.parse_args()
 
@@ -195,12 +205,11 @@ def main():
     logger.setLevel(args.logging)
 
     configuration_name = args.configuration
-    entityId=args.entityId
-    optionname=args.optionname
-    optionvalue=args.optionvalue
-    dhcpserver=args.dhcpserver
-    properties=args.properties
-
+    entityId = args.entityId
+    optionname = args.optionname
+    optionvalue = args.optionvalue
+    dhcpserver = args.dhcpserver
+    properties = args.properties
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -213,33 +222,37 @@ def main():
         configuration_id = configuration_obj["id"]
 
         if properties:
-            prop=bluecat_bam.BAM.convert_dict_in_str_to_dict(properties)
+            prop = bluecat_bam.BAM.convert_dict_in_str_to_dict(properties)
         else:
-            prop={}
+            prop = {}
 
-        #print(prop)
-        dhcpserver_id=0
+        # print(prop)
+        dhcpserver_id = 0
         if dhcpserver:
-            dhcpserver_id=getserverid(dhcpserver, configuration_id, conn)
-            prop['server']=dhcpserver_id
-        #print(prop)
+            dhcpserver_id = getserverid(dhcpserver, configuration_id, conn)
+            prop["server"] = dhcpserver_id
+        # print(prop)
 
-        obj_id=conn.do("addDHCPClientDeploymentOption",
+        obj_id = conn.do(
+            "addDHCPClientDeploymentOption",
             entityId=entityId,
             name=optionname,
             value=optionvalue,
-            properties=prop
+            properties=prop,
         )
 
-        #obj=conn.do("getEntityById",id=obj_id)
-        #print(json.dumps(obj))
+        logger.debug(obj_id)
+        # obj=conn.do("getEntityById",id=obj_id)
+        # print(json.dumps(obj))
 
-        obj=conn.do("getDHCPClientDeploymentOption",
+        obj = conn.do(
+            "getDHCPClientDeploymentOption",
             entityId=entityId,
             name=optionname,
-            serverId=dhcpserver_id
+            serverId=dhcpserver_id,
         )
         print(json.dumps(obj))
+
 
 if __name__ == "__main__":
     main()

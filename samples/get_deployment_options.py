@@ -13,11 +13,9 @@ list their deployment options
 from __future__ import print_function
 
 import os
-import sys
 import json
 import argparse
 import logging
-import re
 
 import bluecat_bam
 
@@ -79,6 +77,7 @@ def argparsecommon():
     )
     return config
 
+
 def get_network(cidr, configuration_id, conn):
     """find block or network for a CIDR"""
     # If both block and network match, return the block
@@ -117,6 +116,7 @@ def get_network(cidr, configuration_id, conn):
             entity = {}
     return entity
 
+
 def main():
     """get_other_dns_server_roles.py"""
     config = argparsecommon()
@@ -145,9 +145,11 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj = conn.do("getIPRangedByIP", address=address, containerId=configuration_id, type="")
-        #print(json.dumps(obj))
-        obj_id=obj['id']
+        obj = conn.do(
+            "getIPRangedByIP", address=address, containerId=configuration_id, type=""
+        )
+        # print(json.dumps(obj))
+        obj_id = obj["id"]
 
         logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
         if obj_id == 0:
@@ -160,18 +162,26 @@ def main():
         # it should return the Network, but it returns the Block.
         # So check for a matching Network.
         if ranged and obj["type"] == "IP4Block":
+            cidr = obj["properties"]["CIDR"]
             network_obj = conn.do(
-                "getEntityByCIDR", method="get", cidr=cidr, parentId=obj_id, type="IP4Network"
+                "getEntityByCIDR",
+                method="get",
+                cidr=cidr,
+                parentId=obj_id,
+                type="IP4Network",
             )
             if network_obj["id"]:
                 obj = network_obj
-                obj_id=obj['id']
+                obj_id = obj["id"]
         print(json.dumps(obj))
 
-        options = conn.do("getDeploymentOptions", entityId=obj_id, optionTypes='', serverId=-1)
+        options = conn.do(
+            "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
+        )
         logger.info(json.dumps(options))
         for option in options:
             print(json.dumps(option))
+
 
 if __name__ == "__main__":
     main()

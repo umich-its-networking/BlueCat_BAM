@@ -145,7 +145,7 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        interface_id=getinterfaceid(server_name, configuration_id, conn)
+        interface_id = getinterfaceid(server_name, configuration_id, conn)
         print(interface_id)
 
 
