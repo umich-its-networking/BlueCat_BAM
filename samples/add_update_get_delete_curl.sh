@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# add_update_get_delete.sh
+# add_update_get_delete_curl.sh
+# example script
 
 CONFIG_ID=557057
 TEST_MAC=0200deadbeef
