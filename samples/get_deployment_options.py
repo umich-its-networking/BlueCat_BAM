@@ -20,14 +20,14 @@ import logging
 import bluecat_bam
 
 
-__progname__ = "get_other_dns_server_roles.py"
+__progname__ = "get_deployment_options.py"
 __version__ = "0.1"
 
 
 def argparsecommon():
     """set up common argparse arguments for BlueCat API"""
     config = argparse.ArgumentParser(
-        description="BlueCat Address Manager get_other_dns_server_roles.py"
+        description="BlueCat Address Manager " + __progname__
     )
     config.add_argument(
         "--server",
@@ -118,11 +118,12 @@ def get_network(cidr, configuration_id, conn):
 
 
 def main():
-    """get_other_dns_server_roles.py"""
+    """get_deployment_options"""
     config = argparsecommon()
     config.add_argument(
         "address",
-        help="Starting IP of network, block, or dhcprange",
+        help="Starting IP of network, block, or dhcprange"
+            + ", or filename containing a list of those",
     )
 
     args = config.parse_args()
