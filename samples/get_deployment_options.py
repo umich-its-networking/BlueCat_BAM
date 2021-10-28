@@ -107,7 +107,7 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    ip_pattern = re.compile("((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
+    ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
     match = ip_pattern.match(address)
     logger.info("Match result: %s", match)
     if match:
@@ -124,8 +124,9 @@ def main():
 
 
 def get_deployment_option(args, address, logger):
+    """get deployment options for the range"""
     configuration_name = args.configuration
-    type = args.type
+    rangetype = args.type
     optionlist = args.options
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
@@ -139,7 +140,7 @@ def get_deployment_option(args, address, logger):
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj = get_range(conn, address, configuration_id, type, logger)
+        obj = get_range(conn, address, configuration_id, rangetype, logger)
         print("IP4Block, IP4Network, or DHCP4Range found:")
         print(json.dumps(obj))
         obj_id = obj["id"]
@@ -155,7 +156,7 @@ def get_deployment_option(args, address, logger):
             print(json.dumps(option))
 
 
-def get_range(conn, address, configuration_id, type, logger):
+def get_range(conn, address, configuration_id, rangetype, logger):
     """get range - block, network, or dhcp range - by ip"""
     logger.info("get_range: %s", address)
     obj = conn.do(
@@ -172,7 +173,7 @@ def get_range(conn, address, configuration_id, type, logger):
         # bug in BlueCat - if Block and Network have the same CIDR,
         # it should return the Network, but it returns the Block.
         # So check for a matching Network.
-        if type == "" and obj["type"] == "IP4Block":
+        if rangetype == "" and obj["type"] == "IP4Block":
             cidr = obj["properties"]["CIDR"]
             network_obj = conn.do(
                 "getEntityByCIDR",
