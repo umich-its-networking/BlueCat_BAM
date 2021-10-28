@@ -16,6 +16,7 @@ import os
 import json
 import argparse
 import logging
+import re
 
 import bluecat_bam
 
@@ -125,6 +126,18 @@ def main():
         help="Starting IP of network, block, or dhcprange"
             + ", or filename containing a list of those",
     )
+    config.add_argument(
+        "--type",
+        help='limit to a specific type: "IP4Block", "IP4Network", or "DHCP4Range"',
+        default=""
+    )
+    config.add_argument(
+        "--options",
+        nargs="*",
+        help='list of options to show, separated by spaces, ''
+            + 'like vendor-class-identifier'
+            + " - see API manual for the API option names"
+    )
 
     args = config.parse_args()
 
@@ -132,8 +145,17 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
+    ip_pattern = re.compile("((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
+    match=ip_pattern.match(args.address)
+    if match:
+        address = match.group(0)
+        get_deployment_option(args, address, logger)
+
+def get_deployment_option(args, address, logger):
     configuration_name = args.configuration
     address = args.address
+    type = args.type
+    optionlist=args.options
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -146,23 +168,38 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj = conn.do(
-            "getIPRangedByIP", address=address, containerId=configuration_id, type=""
-        )
-        # print(json.dumps(obj))
+        obj=get_range(conn, address, configuration_id, type, logger)
+        print(json.dumps(obj))
         obj_id = obj["id"]
 
-        logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
-        if obj_id == 0:
-            print("Not found")
-            ranged = False
-        else:
-            ranged = True
+        options = conn.do(
+            "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
+        )
+        logger.info(json.dumps(options))
+        for option in options:
+            if optionlist and option.get('name') not in optionlist:
+                continue
+            print(json.dumps(option))
 
+
+def get_range(conn, address, configuration_id, type, logger):
+    """get range - block, network, or dhcp range - by ip"""
+    logger.info("get_range", address, configuration_id, type)
+    obj = conn.do(
+        "getIPRangedByIP", address=address, containerId=configuration_id, type=""
+    )
+    # print(json.dumps(obj))
+    obj_id = obj["id"]
+
+    logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
+    if obj_id == 0:
+        print("Not found")
+        obj = None
+    else:
         # bug in BlueCat - if Block and Network have the same CIDR,
         # it should return the Network, but it returns the Block.
         # So check for a matching Network.
-        if ranged and obj["type"] == "IP4Block":
+        if type == "" and obj["type"] == "IP4Block":
             cidr = obj["properties"]["CIDR"]
             network_obj = conn.do(
                 "getEntityByCIDR",
@@ -173,16 +210,8 @@ def main():
             )
             if network_obj["id"]:
                 obj = network_obj
-                obj_id = obj["id"]
-        print(json.dumps(obj))
-
-        options = conn.do(
-            "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
-        )
-        logger.info(json.dumps(options))
-        for option in options:
-            print(json.dumps(option))
-
+                logger.info("IP4Network found: ", obj)
+    return obj
 
 if __name__ == "__main__":
     main()
