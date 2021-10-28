@@ -134,26 +134,35 @@ def main():
     config.add_argument(
         "--options",
         nargs="*",
-        help='list of options to show, separated by spaces, ''
+        help='list of options to show, separated by spaces, '
             + 'like vendor-class-identifier'
             + " - see API manual for the API option names"
     )
 
     args = config.parse_args()
+    address=args.address
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
     ip_pattern = re.compile("((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
-    match=ip_pattern.match(args.address)
+    match=ip_pattern.match(address)
+    logger.info("Match result: %s",match)
     if match:
         address = match.group(0)
+        logger.info("matched: %s",address)
         get_deployment_option(args, address, logger)
+    else:
+        with open(address) as f:
+            for line in f:
+                line=line.strip()
+                logger.info("line read: %s", line)
+                if line != "":  # skip blank lines
+                    get_deployment_option(args, line, logger)
 
 def get_deployment_option(args, address, logger):
     configuration_name = args.configuration
-    address = args.address
     type = args.type
     optionlist=args.options
 
@@ -169,9 +178,11 @@ def get_deployment_option(args, address, logger):
         logger.info(json.dumps(configuration_obj))
 
         obj=get_range(conn, address, configuration_id, type, logger)
+        print("IP4Block, IP4Network, or DHCP4Range found:")
         print(json.dumps(obj))
         obj_id = obj["id"]
 
+        print("Options:")
         options = conn.do(
             "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
         )
@@ -184,7 +195,7 @@ def get_deployment_option(args, address, logger):
 
 def get_range(conn, address, configuration_id, type, logger):
     """get range - block, network, or dhcp range - by ip"""
-    logger.info("get_range", address, configuration_id, type)
+    logger.info("get_range: %s", address)
     obj = conn.do(
         "getIPRangedByIP", address=address, containerId=configuration_id, type=""
     )
@@ -210,7 +221,7 @@ def get_range(conn, address, configuration_id, type, logger):
             )
             if network_obj["id"]:
                 obj = network_obj
-                logger.info("IP4Network found: ", obj)
+                logger.info("IP4Network found: %s", obj)
     return obj
 
 if __name__ == "__main__":
