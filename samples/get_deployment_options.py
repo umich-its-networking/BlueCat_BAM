@@ -85,47 +85,48 @@ def main():
     config.add_argument(
         "address",
         help="Starting IP of network, block, or dhcprange"
-            + ", or filename containing a list of those",
+        + ", or filename containing a list of those",
     )
     config.add_argument(
         "--type",
         help='limit to a specific type: "IP4Block", "IP4Network", or "DHCP4Range"',
-        default=""
+        default="",
     )
     config.add_argument(
         "--options",
         nargs="*",
-        help='list of options to show, separated by spaces, '
-            + 'like vendor-class-identifier'
-            + " - see API manual for the API option names"
+        help="list of options to show, separated by spaces, "
+        + "like vendor-class-identifier"
+        + " - see API manual for the API option names",
     )
 
     args = config.parse_args()
-    address=args.address
+    address = args.address
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
     ip_pattern = re.compile("((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
-    match=ip_pattern.match(address)
-    logger.info("Match result: %s",match)
+    match = ip_pattern.match(address)
+    logger.info("Match result: %s", match)
     if match:
         address = match.group(0)
-        logger.info("matched: %s",address)
+        logger.info("matched: %s", address)
         get_deployment_option(args, address, logger)
     else:
         with open(address) as f:
             for line in f:
-                line=line.strip()
+                line = line.strip()
                 logger.info("line read: %s", line)
                 if line != "":  # skip blank lines
                     get_deployment_option(args, line, logger)
 
+
 def get_deployment_option(args, address, logger):
     configuration_name = args.configuration
     type = args.type
-    optionlist=args.options
+    optionlist = args.options
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -138,7 +139,7 @@ def get_deployment_option(args, address, logger):
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj=get_range(conn, address, configuration_id, type, logger)
+        obj = get_range(conn, address, configuration_id, type, logger)
         print("IP4Block, IP4Network, or DHCP4Range found:")
         print(json.dumps(obj))
         obj_id = obj["id"]
@@ -149,7 +150,7 @@ def get_deployment_option(args, address, logger):
         )
         logger.info(json.dumps(options))
         for option in options:
-            if optionlist and option.get('name') not in optionlist:
+            if optionlist and option.get("name") not in optionlist:
                 continue
             print(json.dumps(option))
 
@@ -184,6 +185,7 @@ def get_range(conn, address, configuration_id, type, logger):
                 obj = network_obj
                 logger.info("IP4Network found: %s", obj)
     return obj
+
 
 if __name__ == "__main__":
     main()
