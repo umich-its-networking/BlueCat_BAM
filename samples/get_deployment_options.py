@@ -111,7 +111,7 @@ def main():
     match = ip_pattern.match(address)
     logger.info("Match result: %s", match)
     if match:
-        address = match.group(0)
+        address = match.group(1)
         logger.info("matched: %s", address)
         get_deployment_option(args, address, logger)
     else:
