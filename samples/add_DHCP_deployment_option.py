@@ -16,6 +16,7 @@ import sys
 import json
 import argparse
 import logging
+import re
 
 import bluecat_bam
 
@@ -123,13 +124,87 @@ def getserverid(server_name, configuration_id, conn):
     return server_id
 
 
+def get_range(conn, address, configuration_id, rangetype, logger):
+    """get range - block, network, or dhcp range - by ip"""
+    logger.info("get_range: %s", address)
+    obj = conn.do(
+        "getIPRangedByIP", address=address, containerId=configuration_id, type=rangetype
+    )
+    # print(json.dumps(obj))
+    obj_id = obj["id"]
+
+    logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
+    if obj_id == 0:
+        print("Not found")
+        obj = None
+    else:
+        # bug in BlueCat - if Block and Network have the same CIDR,
+        # it should return the Network, but it returns the Block.
+        # So check for a matching Network.
+        if rangetype == "" and obj["type"] == "IP4Block":
+            cidr = obj["properties"]["CIDR"]
+            network_obj = conn.do(
+                "getEntityByCIDR",
+                method="get",
+                cidr=cidr,
+                parentId=obj_id,
+                type="IP4Network",
+            )
+            if network_obj["id"]:
+                obj = network_obj
+                logger.info("IP4Network found: %s", obj)
+    return obj
+
+
+def get_id(conn, object_ident, configuration_id, rangetype, logger):
+        id_pattern = re.compile(r"\d+$")
+        id_match = id_pattern.match(object_ident)
+        logger.info("id Match result: %s", id_match)
+        if id_match:   # an id
+            obj_id=object_ident
+        else:   # not an id
+            ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
+            ip_match = ip_pattern.match(object_ident)
+            logger.info("IP Match result: '%s'", ip_match)
+            if ip_match:   # an IP
+                logger.info("IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2))
+                object_ident = ip_match.group(1)
+                if not rangetype:
+                    if ip_match.group(2) == "":
+                        rangetype = "IP4Address"
+                    elif ip_match.group(2) == "-":
+                        rangetype = "DHCP4Range"
+                    # "/" matches either IP4Block or IP4Network
+                if rangetype == "IP4Address":
+                    obj=conn.do(
+                        "getIP4Address", method="get", containerId=configuration_id, address=object_ident
+                    )
+                else:
+                    obj = get_range(conn, object_ident, configuration_id, rangetype, logger)
+                obj_id=obj.get('id')
+            else:   # not and IP or id
+                obj_id = None
+        logger.info("get_id returns %s of type %s", obj, rangetype)
+        return obj_id
+
+def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
+        obj_id = get_id(conn, object_ident, configuration_id, rangetype, logger)
+        if obj_id:
+            id_list=[obj_id]
+        else:   # not an IP or id, must be a file name
+            with open(object_ident) as f:
+                id_list=[ get_id(conn, line.strip(), configuration_id, rangetype, logger) for line in f if line.strip() != "" ]
+        return id_list
+
+
 def main():
     """
     add_DHCP_deployment_option.py entityId optionname optionvalue -p properties
     """
     config = argparsecommon()
-    config.add_argument("entityId")
-    # cannot use None as a default value
+    config.add_argument("entityId", help="Can be: entityId (all digits), individual IP Address (n.n.n.n), IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  " +
+    "or a filename with any of those on each line" +
+    "unless 'type' is set to override the pattern matching")
     config.add_argument("optionname")
     config.add_argument("optionvalue")
     config.add_argument(
@@ -137,6 +212,11 @@ def main():
     )
     config.add_argument(
         "--properties", help='other properties as a JSON dict "{name: value}"'
+    )
+    config.add_argument(
+        "--type",
+        help='limit to a specific type: "IP4Address", "IP4Block", "IP4Network", or "DHCP4Range"',
+        default="",
     )
 
     args = config.parse_args()
@@ -151,6 +231,7 @@ def main():
     optionvalue = args.optionvalue
     dhcpserver = args.dhcpserver
     properties = args.properties
+    rangetype = args.type
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -174,25 +255,35 @@ def main():
             prop["server"] = dhcpserver_id
         # print(prop)
 
-        obj_id = conn.do(
-            "addDHCPClientDeploymentOption",
-            entityId=entityId,
-            name=optionname,
-            value=optionvalue,
-            properties=prop,
-        )
+        object_ident = entityId
+        obj_list=get_id_list(conn, object_ident, configuration_id, rangetype, logger)
+        logger.info(obj_list)
 
-        logger.debug(obj_id)
-        # obj=conn.do("getEntityById",id=obj_id)
-        # print(json.dumps(obj))
+        for entityId in obj_list:
+            entity=conn.do(
+                "getEntityById", id=entityId
+            )
+            print("Entity found:")
+            print(entity)
 
-        obj = conn.do(
-            "getDHCPClientDeploymentOption",
-            entityId=entityId,
-            name=optionname,
-            serverId=dhcpserver_id,
-        )
-        print(json.dumps(obj))
+            print("adding deployment option:")
+            obj_id = conn.do(
+                "addDHCPClientDeploymentOption",
+                entityId=entityId,
+                name=optionname,
+                value=optionvalue,
+                properties=prop,
+            )
+
+            logger.info(obj_id)
+
+            obj = conn.do(
+                "getDHCPClientDeploymentOption",
+                entityId=entityId,
+                name=optionname,
+                serverId=dhcpserver_id,
+            )
+            print(json.dumps(obj))
 
 
 if __name__ == "__main__":
