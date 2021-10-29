@@ -160,7 +160,7 @@ def get_range(conn, address, configuration_id, rangetype, logger):
     """get range - block, network, or dhcp range - by ip"""
     logger.info("get_range: %s", address)
     obj = conn.do(
-        "getIPRangedByIP", address=address, containerId=configuration_id, type=""
+        "getIPRangedByIP", address=address, containerId=configuration_id, type=rangetype
     )
     # print(json.dumps(obj))
     obj_id = obj["id"]
