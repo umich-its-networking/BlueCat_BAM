@@ -82,11 +82,9 @@ def argparsecommon():
 def main():
     """get_deployment_options"""
     config = argparsecommon()
-    config.add_argument(
-        "address",
-        help="Starting IP of network, block, or dhcprange"
-        + ", or filename containing a list of those",
-    )
+    config.add_argument("entityId", help="Can be: entityId (all digits), individual IP Address (n.n.n.n), IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  " +
+        "or a filename with any of those on each line" +
+        "unless 'type' is set to override the pattern matching")
     config.add_argument(
         "--type",
         help='limit to a specific type: "IP4Block", "IP4Network", or "DHCP4Range"',
@@ -101,30 +99,12 @@ def main():
     )
 
     args = config.parse_args()
-    address = args.address
+    entityId = args.entityId
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})(?:$|[^\d])")
-    match = ip_pattern.match(address)
-    logger.info("Match result: %s", match)
-    if match:
-        address = match.group(1)
-        logger.info("matched: %s", address)
-        get_deployment_option(args, address, logger)
-    else:
-        with open(address) as f:
-            for line in f:
-                line = line.strip()
-                logger.info("line read: %s", line)
-                if line != "":  # skip blank lines
-                    get_deployment_option(args, line, logger)
-
-
-def get_deployment_option(args, address, logger):
-    """get deployment options for the range"""
     configuration_name = args.configuration
     rangetype = args.type
     optionlist = args.options
@@ -140,27 +120,77 @@ def get_deployment_option(args, address, logger):
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj = get_range(conn, address, configuration_id, rangetype, logger)
-        print("IP4Block, IP4Network, or DHCP4Range found:")
-        print(json.dumps(obj))
-        obj_id = obj["id"]
+        id_list=get_id_list(conn, entityId, configuration_id, rangetype, logger)
 
-        print("Options:")
-        options = conn.do(
-            "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
-        )
-        logger.info(json.dumps(options))
-        for option in options:
-            if optionlist and option.get("name") not in optionlist:
-                continue
-            print(json.dumps(option))
+        for obj_id in id_list:
+            get_deployment_option(conn, args, obj_id, logger)
 
 
-def get_range(conn, address, configuration_id, rangetype, logger):
+def get_id(conn, object_ident, configuration_id, rangetype, logger):
+        id_pattern = re.compile(r"\d+$")
+        id_match = id_pattern.match(object_ident)
+        logger.info("id Match result: %s", id_match)
+        if id_match:   # an id
+            obj_id=object_ident
+        else:   # not an id
+            ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
+            ip_match = ip_pattern.match(object_ident)
+            logger.info("IP Match result: '%s'", ip_match)
+            if ip_match:   # an IP
+                logger.info("IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2))
+                object_ident = ip_match.group(1)
+                if not rangetype:
+                    if ip_match.group(2) == "":
+                        rangetype = "IP4Address"
+                    elif ip_match.group(2) == "-":
+                        rangetype = "DHCP4Range"
+                    # "/" matches either IP4Block or IP4Network
+                if rangetype == "IP4Address":
+                    obj=conn.do(
+                        "getIP4Address", method="get", containerId=configuration_id, address=object_ident
+                    )
+                else:
+                    obj = get_range(conn, object_ident, configuration_id, rangetype, logger)
+                obj_id=obj.get('id')
+            else:   # not and IP or id
+                obj_id = None
+        logger.info("get_id returns %s of type %s", obj, rangetype)
+        return obj_id
+
+def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
+        obj_id = get_id(conn, object_ident, configuration_id, rangetype, logger)
+        if obj_id:
+            id_list=[obj_id]
+        else:   # not an IP or id, must be a file name
+            with open(object_ident) as f:
+                id_list=[ get_id(conn, line.strip(), configuration_id, rangetype, logger) for line in f if line.strip() != "" ]
+        return id_list
+
+
+def get_deployment_option(conn, args, obj_id, logger):
+    """get deployment options for the range"""
+    optionlist = args.options
+    
+    print("For entity:")
+    obj=conn.do("getEntityById",id=obj_id)
+    print(obj)
+
+    print("Options:")
+    options = conn.do(
+        "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
+    )
+    logger.info(json.dumps(options))
+    for option in options:
+        if optionlist and option.get("name") not in optionlist:
+            continue
+        print(json.dumps(option))
+
+
+def get_range(conn, entityId, configuration_id, rangetype, logger):
     """get range - block, network, or dhcp range - by ip"""
-    logger.info("get_range: %s", address)
+    logger.info("get_range: %s", entityId)
     obj = conn.do(
-        "getIPRangedByIP", address=address, containerId=configuration_id, type=rangetype
+        "getIPRangedByIP", address=entityId, containerId=configuration_id, type=rangetype
     )
     # print(json.dumps(obj))
     obj_id = obj["id"]
