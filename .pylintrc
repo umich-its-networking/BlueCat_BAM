@@ -9,7 +9,7 @@ include-naming-hint=y
 
 # expect duplicate code, for stand-alone modules
 # might refactor someday
-disable=duplicate-code,C0330,W1514
+disable=duplicate-code,C0330,W1514,C0209
 # W1514 unnecessary - wants encoding specified on every 'open'
 
 # show error msg_id, so I can use it in 'disable' if needed, to save space
