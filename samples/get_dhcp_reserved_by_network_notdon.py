@@ -83,7 +83,8 @@ def get_dhcp_reserved(networkid, conn):
         "getEntities",
         parentId=networkid,
     )
-    return ip_list
+    reserved_list = [ ip for ip in ip_list if ip.properties.get('state') == 'DHCP_RESERVED']
+    return reserved_list
 
 
 def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
