@@ -77,47 +77,20 @@ def argparsecommon():
     return config
 
 
-def get_dhcp_reserved(networkid, conn):
+def get_dhcp_reserved(networkid, conn, logger):
     """get list of entities"""
     ip_list = conn.do(
         "getEntities",
         parentId=networkid,
+        type="IP4Address",
+        start=0,
+        count=1000,
     )
-    reserved_list = [ ip for ip in ip_list if ip.properties.get('state') == 'DHCP_RESERVED']
+    # logger.info(ip_list)
+    reserved_list = [
+        ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
+    ]
     return reserved_list
-
-
-def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
-    """found entityId that needs DNS roles, now add them"""
-    print("add interfaces to zone", zone_name)
-    properties = "view=" + str(view_id) + "|"
-    for (interfaceid, role, server_name) in interface_list:
-        role_obj = conn.do(
-            "getDNSDeploymentRole",
-            entityId=entityId,
-            serverInterfaceId=interfaceid,
-        )
-        if role_obj["id"] == 0:
-            roleid = conn.do(
-                "addDNSDeploymentRole",
-                method="post",
-                entityId=entityId,
-                serverInterfaceId=interfaceid,
-                type=role,
-                properties=properties,
-            )
-            print(zone_name, role, server_name, roleid)
-        else:
-            if role_obj["type"] == role:
-                print(zone_name, role, server_name, "role exists")
-            else:
-                print(
-                    zone_name,
-                    role,
-                    server_name,
-                    "existing role is ",
-                    role_obj["type"],
-                )
 
 
 def zonename2cidr(zone_name):
@@ -229,7 +202,7 @@ def get_zone(zone_name, view_id, conn):
 
 
 def main():
-    """add DNS Deployment Role list"""
+    """get_dhcp_reserved_by_network.py"""
     config = argparsecommon()
 
     args = config.parse_args()
@@ -269,17 +242,17 @@ def main():
             if ".in-addr.arpa" in line:
                 zone_name = line
                 cidr = zonename2cidr(zone_name)
-                print("found in-addr", line)
+                logger.info("found in-addr", line)
             elif "/" in line:
                 cidr = line
                 zone_name, errormsg = cidr2zonename(cidr)
                 if errormsg:
                     print("ERROR - / in line, but not valid CIDR", line)
                     continue
-                print("found /", line)
+                logger.info("found /", line)
             if cidr:
                 (ip, prefix) = cidr.split("/")
-                print("CIDR", cidr, "zone", zone_name, "ip", ip, "prefix", prefix)
+                logger.info("CIDR", cidr, "zone", zone_name, "ip", ip, "prefix", prefix)
 
                 # find the block or network
                 entity = get_network(cidr, configuration_id, conn)
@@ -289,6 +262,7 @@ def main():
                     continue
                 logger.debug("found entity %s", json.dumps(entity))
 
+            # will not be a zone in this case, but leave the generic code here
             else:  # no cidr, so a zone name
                 zone_name = line
 
@@ -296,14 +270,16 @@ def main():
                 entity = get_zone(zone_name, view_id, conn)
 
             if not entity:
-                # spent hours debugging, hence the detailed dump
-                # turned out to be a linefeed on the zone name read in
-                # so added .strip() above
                 print("not found", zone_name)
                 continue
 
             # found entityId
-            # entityId = entity["id"]
+            entityId = entity["id"]
+
+            reserved_list = get_dhcp_reserved(entityId, conn, logger)
+            # print(reserved_list)
+            for ip in reserved_list:
+                print(ip)
 
 
 if __name__ == "__main__":
