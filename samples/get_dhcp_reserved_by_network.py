@@ -78,39 +78,41 @@ def argparsecommon():
 
 
 def get_bam_api_list(conn, apiname, **kwargs):
-    if not kwargs['count']:
-        kwargs['count']=1000
-    if not kwargs['start']:
-        kwargs['start']=0
-    count=kwargs['count']
-    replysize=count
-    listall=[]
-    start=0
+    """wrap api call with loop to handle 'start' and 'count'"""
+    if not kwargs["count"]:
+        kwargs["count"] = 1000
+    if not kwargs["start"]:
+        kwargs["start"] = 0
+    count = kwargs["count"]
+    replysize = count
+    listall = []
+    start = 0
     while replysize == count:
-        kwargs['start']=start
-        listone=conn.do(apiname,**kwargs)
-        replysize=len(listone)
-        start+= replysize
-        #print(replysize)
+        kwargs["start"] = start
+        listone = conn.do(apiname, **kwargs)
+        replysize = len(listone)
+        start += replysize
+        # print(replysize)
         listall.extend(listone)
     return listall
 
 
 def get_dhcp_reserved(networkid, conn, logger):
     """get list of entities"""
-    #ip_list = conn.do(
-    ip_list=get_bam_api_list(conn,
+    # ip_list = conn.do(
+    ip_list = get_bam_api_list(
+        conn,
         "getEntities",
         parentId=networkid,
         type="IP4Address",
         start=0,
         count=1000,
     )
-    #logger.info(ip_list)
+    logger.debug(ip_list)
     reserved_list = [
         ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
     ]
-    print("dhcp",len(ip_list),"reserved", len(reserved_list), file=sys.stderr)
+    print("dhcp", len(ip_list), "reserved", len(reserved_list), file=sys.stderr)
     return reserved_list
 
 
@@ -263,17 +265,19 @@ def main():
             if ".in-addr.arpa" in line:
                 zone_name = line
                 cidr = zonename2cidr(zone_name)
-                logger.info("found in-addr", line)
+                logger.info("found in-addr: %s", line)
             elif "/" in line:
                 cidr = line
                 zone_name, errormsg = cidr2zonename(cidr)
                 if errormsg:
                     print("ERROR - / in line, but not valid CIDR", line)
                     continue
-                logger.info("found /", line)
+                logger.info("found /: %s", line)
             if cidr:
                 (ip, prefix) = cidr.split("/")
-                logger.info("CIDR", cidr, "zone", zone_name, "ip", ip, "prefix", prefix)
+                logger.info(
+                    "CIDR %s, zone %s, ip %s, prefix %s", cidr, zone_name, ip, prefix
+                )
 
                 # find the block or network
                 entity = get_network(cidr, configuration_id, conn)
