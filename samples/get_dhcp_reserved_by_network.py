@@ -77,19 +77,40 @@ def argparsecommon():
     return config
 
 
+def get_bam_api_list(conn, apiname, **kwargs):
+    if not kwargs['count']:
+        kwargs['count']=1000
+    if not kwargs['start']:
+        kwargs['start']=0
+    count=kwargs['count']
+    replysize=count
+    listall=[]
+    start=0
+    while replysize == count:
+        kwargs['start']=start
+        listone=conn.do(apiname,**kwargs)
+        replysize=len(listone)
+        start+= replysize
+        #print(replysize)
+        listall.extend(listone)
+    return listall
+
+
 def get_dhcp_reserved(networkid, conn, logger):
     """get list of entities"""
-    ip_list = conn.do(
+    #ip_list = conn.do(
+    ip_list=get_bam_api_list(conn,
         "getEntities",
         parentId=networkid,
         type="IP4Address",
         start=0,
         count=1000,
     )
-    # logger.info(ip_list)
+    #logger.info(ip_list)
     reserved_list = [
         ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
     ]
+    print("dhcp",len(ip_list),"reserved", len(reserved_list), file=sys.stderr)
     return reserved_list
 
 
