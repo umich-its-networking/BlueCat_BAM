@@ -148,41 +148,27 @@ def cidr2zonename(cidr):
 
 
 def get_network(cidr, configuration_id, conn):
-    """find block or network for a CIDR"""
-    # If both block and network match, return the block
+    """find network for a CIDR"""
+    # If both block and network match, return the network
     # bam getIPRangedByIP containerId=21216763 type=IP4Block address=10.2.1.0
     ip = cidr.split("/")[0]  # (ip,prefix) = cidr.split("/")
-    block_obj = conn.do(
+    # find network
+    network_obj = conn.do(
         "getIPRangedByIP",
         method="get",
         containerId=configuration_id,
-        type="IP4Block",
+        type="IP4Network",
         address=ip,
     )
-    # print("block_obj",json.dumps(block_obj))
+    network_id = network_obj["id"]
 
-    if block_obj["properties"]["CIDR"] == cidr:
-        # print('found matching block',json.dumps(block_obj))
-        entity = block_obj
+    if network_id == 0:
+        entity = {}
+    elif network_obj["properties"]["CIDR"] == cidr:
+        # print("found matching network",json.dumps(network_obj))
+        entity = network_obj
     else:
-        # find network
-        network_obj = conn.do(
-            "getIPRangedByIP",
-            method="get",
-            containerId=block_obj["id"],
-            type="IP4Network",
-            address=ip,
-        )
-        network_id = network_obj["id"]
-        # print("existing network",json.dumps(network_obj))
-
-        if network_id == 0:
-            entity = {}
-        elif network_obj["properties"]["CIDR"] == cidr:
-            # print("found matching network",json.dumps(network_obj))
-            entity = network_obj
-        else:
-            entity = {}
+        entity = {}
     return entity
 
 
