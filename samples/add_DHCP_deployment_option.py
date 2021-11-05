@@ -233,6 +233,11 @@ def main():
         + 'or "DHCP4Range"',
         default="",
     )
+    config.add_argument(
+        "--service",
+        help='add a DHCP Service Deployment Option (default is a DHCP Client Deployment Option)',
+        action='store_true',
+    )
 
     args = config.parse_args()
 
@@ -280,8 +285,14 @@ def main():
             print(entity)
 
             print("adding deployment option:")
+            if args.service:
+                api='addDHCPServiceDeploymentOption'
+                api2='getDHCPServiceDeploymentOption'
+            else:
+                api='addDHCPClientDeploymentOption'
+                api2='getDHCPClientDeploymentOption'
             obj_id = conn.do(
-                "addDHCPClientDeploymentOption",
+                api,
                 entityId=entityId,
                 name=optionname,
                 value=optionvalue,
@@ -291,7 +302,7 @@ def main():
             logger.info(obj_id)
 
             obj = conn.do(
-                "getDHCPClientDeploymentOption",
+                api2,
                 entityId=entityId,
                 name=optionname,
                 serverId=dhcpserver_id,
