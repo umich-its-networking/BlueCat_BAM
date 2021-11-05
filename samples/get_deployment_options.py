@@ -180,15 +180,35 @@ def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
     return id_list
 
 
+def getfield(obj, fieldname):
+    """get a field for printing"""
+    field = obj.get(fieldname)
+    if field:
+        output = fieldname + ": " + field + ", "
+    else:
+        output = ""
+    return output
+
+
+def getprop(obj, fieldname):
+    """get a property for printing"""
+    return getfield(obj["properties"], fieldname)
+
+
 def get_deployment_option(conn, args, obj_id, logger):
     """get deployment options for the range"""
     optionlist = args.options
 
-    print("For entity:")
     obj = conn.do("getEntityById", id=obj_id)
-    print(obj)
+    objtype = getfield(obj, "type")
+    name = getfield(obj, "name")
+    cidr = getprop(obj, "CIDR")
+    start = getprop(obj, "start")
+    end = getprop(obj, "end")
+    print("For entity: ", objtype, name, cidr, start, end)
+    # print(obj)
 
-    print("Options:")
+    print("    Options:")
     options = conn.do(
         "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
     )
@@ -196,7 +216,12 @@ def get_deployment_option(conn, args, obj_id, logger):
     for option in options:
         if optionlist and option.get("name") not in optionlist:
             continue
-        print(json.dumps(option))
+        objtype = getfield(option, "type")
+        name = getfield(option, "name")
+        value = getfield(option, "value")
+        inherited = getprop(option, "inherited")
+        print("    ", objtype, name, value, inherited)
+        # print(json.dumps(option))
 
 
 def get_range(conn, entityId, configuration_id, rangetype, logger):
