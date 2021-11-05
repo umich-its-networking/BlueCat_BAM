@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-get_dhcp_reserved_by_network.py < list-of-networkIP
+get_dhcp_ranges_by_network.py < list-of-networkIP
 [--cfg configuration] [--view viewname]
 """
 
@@ -15,18 +15,19 @@ import json
 import argparse
 import logging
 import re
+import ipaddress
 
 import bluecat_bam
 
 
-__progname__ = "get_dhcp_reserved_by_network"
+__progname__ = "get_dhcp_ranges_by_network"
 __version__ = "0.1"
 
 
 def argparsecommon():
     """set up common argparse arguments for BlueCat API"""
     config = argparse.ArgumentParser(
-        description="BlueCat Address Manager get_dhcp_reserved_by_network"
+        description="BlueCat Address Manager get_dhcp_ranges_by_network"
     )
     config.add_argument(
         "--server",
@@ -78,40 +79,37 @@ def argparsecommon():
 
 
 def get_bam_api_list(conn, apiname, **kwargs):
-    if not kwargs['count']:
-        kwargs['count']=1000
-    if not kwargs['start']:
-        kwargs['start']=0
-    count=kwargs['count']
-    replysize=count
-    listall=[]
-    start=0
+    """wrap api call with loop to handle 'start' and 'count'"""
+    if not kwargs["count"]:
+        kwargs["count"] = 1000
+    if not kwargs["start"]:
+        kwargs["start"] = 0
+    count = kwargs["count"]
+    replysize = count
+    listall = []
+    start = 0
     while replysize == count:
-        kwargs['start']=start
-        listone=conn.do(apiname,**kwargs)
-        replysize=len(listone)
-        start+= replysize
-        #print(replysize)
+        kwargs["start"] = start
+        listone = conn.do(apiname, **kwargs)
+        replysize = len(listone)
+        start += replysize
+        # print(replysize)
         listall.extend(listone)
     return listall
 
 
-def get_dhcp_reserved(networkid, conn, logger):
-    """get list of entities"""
-    #ip_list = conn.do(
-    ip_list=get_bam_api_list(conn,
+def get_dhcp_ranges(networkid, conn, logger):
+    """get list of ranges"""
+    range_list = get_bam_api_list(
+        conn,
         "getEntities",
         parentId=networkid,
-        type="IP4Address",
+        type="DHCP4Range",
         start=0,
         count=1000,
     )
-    #logger.info(ip_list)
-    reserved_list = [
-        ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
-    ]
-    print("dhcp",len(ip_list),"reserved", len(reserved_list), file=sys.stderr)
-    return reserved_list
+    logger.debug(range_list)
+    return range_list
 
 
 def zonename2cidr(zone_name):
@@ -222,8 +220,42 @@ def get_zone(zone_name, view_id, conn):
     return {}
 
 
+def get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id):
+    """get zone, network, or block by name or ip or cidr"""
+    logger = logging.getLogger()
+    cidr = False
+    if ".in-addr.arpa" in line:
+        zone_name = line
+        cidr = zonename2cidr(zone_name)
+        logger.info("found in-addr: %s", line)
+    elif "/" in line:
+        cidr = line
+        zone_name, errormsg = cidr2zonename(cidr)
+        if errormsg:
+            print("ERROR - / in line, but not valid CIDR", line)
+            cidr = None
+        logger.info("found /: %s", line)
+    if cidr:
+        (ip, prefix) = cidr.split("/")
+        logger.info("CIDR %s, zone %s, ip %s, prefix %s", cidr, zone_name, ip, prefix)
+
+        # find the block or network
+        entity = get_network(cidr, configuration_id, conn)
+
+        if not entity:
+            print("network not found", line)
+        logger.debug("found entity %s", json.dumps(entity))
+
+    # will not be a zone in this case, but leave the generic code here
+    else:  # no cidr, so a zone name
+        zone_name = line
+        # search if zone exists
+        entity = get_zone(zone_name, view_id, conn)
+    return entity
+
+
 def main():
-    """get_dhcp_reserved_by_network.py"""
+    """get_dhcp_ranges_by_network.py"""
     config = argparsecommon()
 
     args = config.parse_args()
@@ -259,48 +291,30 @@ def main():
             # pattern match to cidr or zone name, fwd or rev
             # set zone_name, and cidr if applicable
             line = line.strip()
-            cidr = False
-            if ".in-addr.arpa" in line:
-                zone_name = line
-                cidr = zonename2cidr(zone_name)
-                logger.info("found in-addr", line)
-            elif "/" in line:
-                cidr = line
-                zone_name, errormsg = cidr2zonename(cidr)
-                if errormsg:
-                    print("ERROR - / in line, but not valid CIDR", line)
-                    continue
-                logger.info("found /", line)
-            if cidr:
-                (ip, prefix) = cidr.split("/")
-                logger.info("CIDR", cidr, "zone", zone_name, "ip", ip, "prefix", prefix)
 
-                # find the block or network
-                entity = get_network(cidr, configuration_id, conn)
-
-                if not entity:
-                    print("network not found", line)
-                    continue
-                logger.debug("found entity %s", json.dumps(entity))
-
-            # will not be a zone in this case, but leave the generic code here
-            else:  # no cidr, so a zone name
-                zone_name = line
-
-                # search if zone exists
-                entity = get_zone(zone_name, view_id, conn)
-
+            entity = get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id)
             if not entity:
-                print("not found", zone_name)
+                print("not found", line)
                 continue
 
             # found entityId
             entityId = entity["id"]
+            cidr = entity["properties"]["CIDR"]
+            print(
+                "Network: %s\t%s size %s"
+                % (entity["name"], cidr, ipaddress.IPv4Network(cidr).num_addresses)
+            )
+            # print(entity)
 
-            reserved_list = get_dhcp_reserved(entityId, conn, logger)
-            # print(reserved_list)
-            for ip in reserved_list:
-                print(ip)
+            # print("Ranges:")
+            ranges_list = get_dhcp_ranges(entityId, conn, logger)
+            # print(ranges_list)
+            for x in ranges_list:
+                # print(x)
+                start = ipaddress.ip_address(x["properties"]["start"])
+                end = ipaddress.ip_address(x["properties"]["end"])
+                rangesize = int(end) - int(start) + 1
+                print("    DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
 
 
 if __name__ == "__main__":
