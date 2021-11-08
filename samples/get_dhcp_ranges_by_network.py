@@ -301,6 +301,8 @@ def main():
                 end = ipaddress.ip_address(x["properties"]["end"])
                 rangesize = int(end) - int(start) + 1
                 print("    DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
+            if not ranges_list:
+                print("    DHCP_range: none")
 
 
 if __name__ == "__main__":

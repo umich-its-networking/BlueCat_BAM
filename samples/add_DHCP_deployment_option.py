@@ -78,7 +78,7 @@ def argparsecommon():
 
 def getserverid(server_name, configuration_id, conn):
     """get server id, given the server domainname or displayname"""
-    # try by the server displayname
+    # try by the server domainname
     interface_obj_list = conn.do(
         "searchByObjectTypes",
         keyword=server_name,
@@ -235,8 +235,9 @@ def main():
     )
     config.add_argument(
         "--service",
-        help='add a DHCP Service Deployment Option (default is a DHCP Client Deployment Option)',
-        action='store_true',
+        help="add a DHCP SERVICE Deployment Option "
+        + "(default is a DHCP CLIENT Deployment Option)",
+        action="store_true",
     )
 
     args = config.parse_args()
@@ -247,11 +248,6 @@ def main():
 
     configuration_name = args.configuration
     entityId = args.entityId
-    optionname = args.optionname
-    optionvalue = args.optionvalue
-    dhcpserver = args.dhcpserver
-    properties = args.properties
-    rangetype = args.type
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -263,20 +259,20 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        if properties:
-            prop = bluecat_bam.BAM.convert_dict_in_str_to_dict(properties)
+        if args.properties:
+            prop = bluecat_bam.BAM.convert_dict_in_str_to_dict(args.properties)
         else:
             prop = {}
 
         # print(prop)
         dhcpserver_id = 0
-        if dhcpserver:
-            dhcpserver_id = getserverid(dhcpserver, configuration_id, conn)
+        if args.dhcpserver:
+            dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
             prop["server"] = dhcpserver_id
         # print(prop)
 
         object_ident = entityId
-        obj_list = get_id_list(conn, object_ident, configuration_id, rangetype, logger)
+        obj_list = get_id_list(conn, object_ident, configuration_id, args.type, logger)
         logger.info(obj_list)
 
         for entityId in obj_list:
@@ -286,16 +282,16 @@ def main():
 
             print("adding deployment option:")
             if args.service:
-                api='addDHCPServiceDeploymentOption'
-                api2='getDHCPServiceDeploymentOption'
+                api = "addDHCPServiceDeploymentOption"
+                api2 = "getDHCPServiceDeploymentOption"
             else:
-                api='addDHCPClientDeploymentOption'
-                api2='getDHCPClientDeploymentOption'
+                api = "addDHCPClientDeploymentOption"
+                api2 = "getDHCPClientDeploymentOption"
             obj_id = conn.do(
                 api,
                 entityId=entityId,
-                name=optionname,
-                value=optionvalue,
+                name=args.optionname,
+                value=args.optionvalue,
                 properties=prop,
             )
 
@@ -304,7 +300,7 @@ def main():
             obj = conn.do(
                 api2,
                 entityId=entityId,
-                name=optionname,
+                name=args.optionname,
                 serverId=dhcpserver_id,
             )
             print(json.dumps(obj))

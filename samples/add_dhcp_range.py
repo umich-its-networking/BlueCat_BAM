@@ -10,7 +10,6 @@ add_dhcp_range.py < list-of-networkIP
 from __future__ import print_function
 
 import os
-import sys
 import json
 import argparse
 import logging
@@ -200,13 +199,13 @@ def get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id):
     """get zone, network, or block by name or ip or cidr"""
     logger = logging.getLogger()
     cidr = False
-    zone_name=""
+    zone_name = ""
     ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
     ip_match = ip_pattern.match(line)
     logger.info("IP Match result: '%s'", ip_match)
     if ip_match:  # an IP or CIDR
-        ip=ip_match.group(1)
-        prefix=""
+        ip = ip_match.group(1)
+        prefix = ""
         if "/" in line:
             cidr = line
             (ip, prefix) = cidr.split("/")
@@ -274,9 +273,7 @@ def main():
         )
         view_id = view_obj["id"]
 
-        entity = get_entity_by_name_ip_cidr(
-            conn, args.start, configuration_id, view_id
-        )
+        entity = get_entity_by_name_ip_cidr(conn, args.start, configuration_id, view_id)
         if not entity:
             print("not found", args.start)
         else:
