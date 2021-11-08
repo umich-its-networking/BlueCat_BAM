@@ -4,7 +4,7 @@
 const-rgx=^([a-z_][a-z0-9_]{0,30}|[A-Z_][A-Z0-9_]{0,30})$
 variable-rgx=^[a-z_][a-zA-Z0-9_]{0,35}$
 module-rgx=^[a-z_][a-zA-Z0-9_]{2,35}$
-argument-rgx=^[a-z_][a-zA-Z0-9_]{2,35}$
+argument-rgx=^[a-z_][a-zA-Z0-9_]{1,35}$
 include-naming-hint=y
 
 # expect duplicate code, for stand-alone modules
