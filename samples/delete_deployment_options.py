@@ -224,9 +224,12 @@ def delete_deployment_option(conn, args, obj_id, logger):
         inherited = getprop(option, "inherited")
         print("    ", objtype, name, value, inherited)
         # print(json.dumps(option))
-        result = conn.do("delete", objectId=option["id"])
-        if result:
-            print("result: ", result)
+        if "false" in inherited:
+            result = conn.do("delete", objectId=option["id"])
+            if result:
+                print("result: ", result)
+        else:
+            print("inherited option, cannot delete from here")
 
 
 def get_range(conn, entityId, configuration_id, rangetype, logger):

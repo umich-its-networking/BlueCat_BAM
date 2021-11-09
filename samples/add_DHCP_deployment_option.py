@@ -207,6 +207,21 @@ def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
     return id_list
 
 
+def getfield(obj, fieldname):
+    """get a field for printing"""
+    field = obj.get(fieldname)
+    if field:
+        output = fieldname + ": " + field + ", "
+    else:
+        output = ""
+    return output
+
+
+def getprop(obj, fieldname):
+    """get a property for printing"""
+    return getfield(obj["properties"], fieldname)
+
+
 def main():
     """
     add_DHCP_deployment_option.py entityId optionname optionvalue -p properties
@@ -246,15 +261,12 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    configuration_name = args.configuration
-    entityId = args.entityId
-
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
             "getEntityByName",
             method="get",
             parentId=0,
-            name=configuration_name,
+            name=args.configuration,
             type="Configuration",
         )
         configuration_id = configuration_obj["id"]
@@ -271,16 +283,27 @@ def main():
             prop["server"] = dhcpserver_id
         # print(prop)
 
-        object_ident = entityId
+        object_ident = args.entityId
         obj_list = get_id_list(conn, object_ident, configuration_id, args.type, logger)
         logger.info(obj_list)
 
         for entityId in obj_list:
             entity = conn.do("getEntityById", id=entityId)
-            print("Entity found:")
-            print(entity)
+            # print("Entity found:")
+            # print(entity)
+            objtype = getfield(entity, "type")
+            name = getfield(entity, "name")
 
-            print("adding deployment option:")
+            print(
+                "For entity: ",
+                objtype,
+                name,
+                getprop(entity, "CIDR"),
+                getprop(entity, "start"),
+                getprop(entity, "end"),
+            )
+
+            # print("adding deployment option:")
             if args.service:
                 api = "addDHCPServiceDeploymentOption"
                 api2 = "getDHCPServiceDeploymentOption"
@@ -297,13 +320,18 @@ def main():
 
             logger.info(obj_id)
 
-            obj = conn.do(
+            option = conn.do(
                 api2,
                 entityId=entityId,
                 name=args.optionname,
                 serverId=dhcpserver_id,
             )
-            print(json.dumps(obj))
+            # print(json.dumps(option))
+            objtype = getfield(option, "type")
+            name = getfield(option, "name")
+            value = getfield(option, "value")
+            inherited = getprop(option, "inherited")
+            print("    Added deployment option:", objtype, name, value, inherited)
 
 
 if __name__ == "__main__":

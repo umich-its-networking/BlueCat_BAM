@@ -184,7 +184,7 @@ def getfield(obj, fieldname):
     """get a field for printing"""
     field = obj.get(fieldname)
     if field:
-        output = fieldname + ": " + field + ", "
+        output = fieldname + ": " + str(field) + ", "
     else:
         output = ""
     return output
@@ -216,11 +216,12 @@ def get_deployment_option(conn, args, obj_id, logger):
     for option in options:
         if optionlist and option.get("name") not in optionlist:
             continue
+        opt_id = getfield(option, "id")
         objtype = getfield(option, "type")
         name = getfield(option, "name")
         value = getfield(option, "value")
         inherited = getprop(option, "inherited")
-        print("    ", objtype, name, value, inherited)
+        print("    ", opt_id, objtype, name, value, inherited)
         # print(json.dumps(option))
 
 
