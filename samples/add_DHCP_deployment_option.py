@@ -72,7 +72,7 @@ def getserverid(server_name, configuration_id, conn):
 
 
 def get_range(conn, address, configuration_id, rangetype):
-    """get range - block, network, or dhcp range - by ip"""
+    """get range - block, network, or dhcp range - by IPv4 or IPv6"""
     logger = logging.getLogger()
     logger.info("get_range: %s", address)
     obj = conn.do(
@@ -104,7 +104,7 @@ def get_range(conn, address, configuration_id, rangetype):
     return obj
 
 
-def get_id(conn, object_ident, configuration_id, rangetype):
+def get_id(conn, object_ident, containerId, rangetype):
     """get id for a particular object"""
     logger = logging.getLogger()
     id_pattern = re.compile(r"\d+$")
@@ -129,11 +129,11 @@ def get_id(conn, object_ident, configuration_id, rangetype):
                 obj = conn.do(
                     "getIP4Address",
                     method="get",
-                    containerId=configuration_id,
+                    containerId=containerId,
                     address=object_ident,
                 )
             else:
-                obj = get_range(conn, object_ident, configuration_id, rangetype)
+                obj = get_range(conn, object_ident, containerId, rangetype)
             obj_id = obj.get("id")
         else:  # not and IP or id
             obj_id = None
@@ -141,15 +141,15 @@ def get_id(conn, object_ident, configuration_id, rangetype):
     return obj_id
 
 
-def get_id_list(conn, object_ident, configuration_id, rangetype):
+def get_id_list(conn, object_ident, containerId, rangetype):
     """get object, or a list of objects from a file"""
-    obj_id = get_id(conn, object_ident, configuration_id, rangetype)
+    obj_id = get_id(conn, object_ident, containerId, rangetype)
     if obj_id:
         id_list = [obj_id]
     else:  # not an IP or id, must be a file name
         with open(object_ident) as f:
             id_list = [
-                get_id(conn, line.strip(), configuration_id, rangetype)
+                get_id(conn, line.strip(), containerId, rangetype)
                 for line in f
                 if line.strip() != ""
             ]
@@ -233,13 +233,11 @@ def main():
         # print(prop)
 
         object_ident = args.entityId
-        obj_list = get_id_list(conn, object_ident, configuration_id, args.type)
-        logger.info(obj_list)
+        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        logger.info(entity_list)
 
-        for entityId in obj_list:
-            entity = conn.do("getEntityById", id=entityId)
-            # print("Entity found:")
-            # print(entity)
+        for entity in entity_list:
+            entity_id = entity.get("id")
             objtype = getfield(entity, "type")
             name = getfield(entity, "name")
 
@@ -259,23 +257,22 @@ def main():
             else:
                 api = "addDHCPClientDeploymentOption"
                 api2 = "getDHCPClientDeploymentOption"
-            obj_id = conn.do(
+            option_id = conn.do(
                 api,
-                entityId=entityId,
+                entityId=entity_id,
                 name=args.optionname,
                 value=args.optionvalue,
                 properties=prop,
             )
-
-            logger.info(obj_id)
+            logger.info(option_id)
 
             option = conn.do(
                 api2,
-                entityId=entityId,
+                entityId=entity_id,
                 name=args.optionname,
                 serverId=dhcpserver_id,
             )
-            # print(json.dumps(option))
+            logger.info(json.dumps(option))
             objtype = getfield(option, "type")
             name = getfield(option, "name")
             value = getfield(option, "value")
