@@ -22,57 +22,6 @@ __progname__ = "add_DHCP_Deployment_Role_list"
 __version__ = "0.1"
 
 
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager add_DNS_Deployment_Role_list"
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
-
-
 def getinterfaceid(server_name, configuration_id, conn):
     """get server interface id, given the server name"""
     interface_obj_list = conn.do(
@@ -172,7 +121,7 @@ def get_network(network_ip, configuration_id, conn):
 
 def main():
     """add DNS Deployment Role list"""
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
     config.add_argument("primaryDHCPservername")
     # cannot use None as a default value
     config.add_argument("failoverDHCPservername", default="fred")
