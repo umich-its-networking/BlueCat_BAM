@@ -55,7 +55,11 @@ from __future__ import unicode_literals
 import sys
 import logging
 import json
+import argparse
+import os
+import re
 import requests
+
 
 # double underscore names
 __progname__ = "api"
@@ -363,3 +367,150 @@ class BAM(requests.Session):  # pylint: disable=R0902
                     method_from_wadl = method
                     break
         return method_from_wadl
+
+    @staticmethod
+    def argparsecommon():
+        """set up common argparse arguments for BlueCat API"""
+        config = argparse.ArgumentParser(
+            description="BlueCat Address Manager add_DNS_Deployment_Role_list"
+        )
+        config.add_argument(
+            "--server",
+            "-s",
+            # env_var="BLUECAT_SERVER",
+            default=os.getenv("BLUECAT_SERVER"),
+            help="BlueCat Address Manager hostname",
+        )
+        config.add_argument(
+            "--username",
+            "-u",
+            # env_var="BLUECAT_USERNAME",
+            default=os.getenv("BLUECAT_USERNAME"),
+        )
+        config.add_argument(
+            "--password",
+            "-p",
+            # env_var="BLUECAT_PASSWORD",
+            default=os.getenv("BLUECAT_PASSWORD"),
+            help="password in environment, should not be on command line",
+        )
+        config.add_argument(
+            "--configuration",
+            "--cfg",
+            help="BlueCat Configuration name",
+            default=os.getenv("BLUECAT_CONFIGURATION"),
+        )
+        config.add_argument(
+            "--raw",
+            "-r",
+            default=os.getenv("BLUECAT_RAW"),
+            help="set to true to not convert strings like 'name=value|...' "
+            + "to dictionaries on output.  Will accept either format on input.",
+        )
+        config.add_argument(
+            "--version", action="version", version=__progname__ + ".py " + __version__
+        )
+        config.add_argument(
+            "--logging",
+            "-l",
+            help="log level, default WARNING (30),"
+            + "caution: level DEBUG(10) or less "
+            + "will show the password in the login call",
+            default=os.getenv("BLUECAT_LOGGING", "WARNING"),
+        )
+        return config
+
+    # @staticmethod
+    def get_id_list(self, conn, object_ident, containerId, rangetype):
+        """get object id, or a list of objects from a file"""
+        obj_list = self.get_obj_list(conn, object_ident, containerId, rangetype)
+        id_list = [obj.get("id") for obj in obj_list]
+        return id_list
+
+    # @staticmethod
+    def get_obj_list(self, conn, object_ident, containerId, rangetype):
+        """get object, or a list of objects from a file"""
+        logger = logging.getLogger()
+        obj = self.get_obj(conn, object_ident, containerId, rangetype)
+        obj_id = obj.get("id")
+        if obj_id:
+            obj_list = [obj]
+        else:  # not an object, must be a file name
+            try:
+                with open(object_ident) as f:
+                    obj_list = [
+                        self.get_obj(conn, line.strip(), containerId, rangetype)
+                        for line in f
+                        if line.strip() != ""
+                    ]
+            except ValueError:
+                logger.info("failed to find object or open file: '%s'", object_ident)
+                obj_list = []
+        return obj_list
+
+    # @staticmethod
+    def get_obj(self, conn, object_ident, containerId, rangetype):
+        """get an object, given an id, IP, CIDR, or range"""
+        logger = logging.getLogger()
+        id_pattern = re.compile(r"\d+$")
+        id_match = id_pattern.match(object_ident)
+        logger.info("id Match result: %s", id_match)
+        if id_match:  # an id
+            obj = conn.do("getEntityById", id=object_ident)
+        else:  # not an id
+            ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
+            ip_match = ip_pattern.match(object_ident)
+            logger.info("IP Match result: '%s'", ip_match)
+            if ip_match:  # an IP
+                logger.info(
+                    "IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2)
+                )
+                object_ident = ip_match.group(1)
+                if not rangetype:
+                    if ip_match.group(2) == "-":
+                        rangetype = "DHCP4Range"
+                    # "/" matches either IP4Block or IP4Network
+                if rangetype == "IP4Address":
+                    obj = conn.do(
+                        "getIP4Address",
+                        method="get",
+                        containerId=containerId,
+                        address=object_ident,
+                    )
+                else:
+                    obj = self.get_range(conn, object_ident, containerId, rangetype)
+            else:  # not and IP or id
+                obj = None
+        logger.info("get_obj returns %s of type %s", obj, rangetype)
+        return obj
+
+    @staticmethod
+    def get_range(conn, address, containerId, rangetype):
+        """get range - block, network, or dhcp range - by IPv4 or IPv6"""
+        logger = logging.getLogger()
+        logger.info("get_range: %s", address)
+        obj = conn.do(
+            "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
+        )
+        obj_id = obj["id"]
+
+        logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
+        if obj_id == 0:
+            obj = None
+        else:
+            # bug in BlueCat - if Block and Network have the same CIDR,
+            # it should return the Network, but it returns the Block.
+            # So check for a matching Network.
+            if rangetype == "" and obj["type"] == "IP4Block":
+                cidr = obj["properties"]["CIDR"]
+                network_obj = conn.do(
+                    "getEntityByCIDR",
+                    method="get",
+                    cidr=cidr,
+                    parentId=obj_id,
+                    type="IP4Network",
+                )
+                if network_obj["id"]:
+                    obj = network_obj
+                    logger.info("IP4Network found: %s", obj)
+        return obj
