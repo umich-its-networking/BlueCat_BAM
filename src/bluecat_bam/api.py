@@ -401,6 +401,9 @@ class BAM(requests.Session):  # pylint: disable=R0902
             default=os.getenv("BLUECAT_CONFIGURATION"),
         )
         config.add_argument(
+            "--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW")
+        )
+        config.add_argument(
             "--raw",
             "-r",
             default=os.getenv("BLUECAT_RAW"),
