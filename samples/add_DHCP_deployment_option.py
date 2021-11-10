@@ -11,10 +11,8 @@ add_DHCP_deployment_option.py entity optionname optionvalue --properties propert
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 import re
 
@@ -23,57 +21,6 @@ import bluecat_bam
 
 __progname__ = "add_DHCP_deployment_option"
 __version__ = "0.1"
-
-
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager add_DNS_Deployment_Role_list"
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
 
 
 def getserverid(server_name, configuration_id, conn):
@@ -124,8 +71,9 @@ def getserverid(server_name, configuration_id, conn):
     return server_id
 
 
-def get_range(conn, address, configuration_id, rangetype, logger):
+def get_range(conn, address, configuration_id, rangetype):
     """get range - block, network, or dhcp range - by ip"""
+    logger = logging.getLogger()
     logger.info("get_range: %s", address)
     obj = conn.do(
         "getIPRangedByIP", address=address, containerId=configuration_id, type=rangetype
@@ -156,8 +104,9 @@ def get_range(conn, address, configuration_id, rangetype, logger):
     return obj
 
 
-def get_id(conn, object_ident, configuration_id, rangetype, logger):
+def get_id(conn, object_ident, configuration_id, rangetype):
     """get id for a particular object"""
+    logger = logging.getLogger()
     id_pattern = re.compile(r"\d+$")
     id_match = id_pattern.match(object_ident)
     logger.info("id Match result: %s", id_match)
@@ -184,7 +133,7 @@ def get_id(conn, object_ident, configuration_id, rangetype, logger):
                     address=object_ident,
                 )
             else:
-                obj = get_range(conn, object_ident, configuration_id, rangetype, logger)
+                obj = get_range(conn, object_ident, configuration_id, rangetype)
             obj_id = obj.get("id")
         else:  # not and IP or id
             obj_id = None
@@ -192,15 +141,15 @@ def get_id(conn, object_ident, configuration_id, rangetype, logger):
     return obj_id
 
 
-def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
+def get_id_list(conn, object_ident, configuration_id, rangetype):
     """get object, or a list of objects from a file"""
-    obj_id = get_id(conn, object_ident, configuration_id, rangetype, logger)
+    obj_id = get_id(conn, object_ident, configuration_id, rangetype)
     if obj_id:
         id_list = [obj_id]
     else:  # not an IP or id, must be a file name
         with open(object_ident) as f:
             id_list = [
-                get_id(conn, line.strip(), configuration_id, rangetype, logger)
+                get_id(conn, line.strip(), configuration_id, rangetype)
                 for line in f
                 if line.strip() != ""
             ]
@@ -226,7 +175,7 @@ def main():
     """
     add_DHCP_deployment_option.py entityId optionname optionvalue -p properties
     """
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
         "entityId",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -284,7 +233,7 @@ def main():
         # print(prop)
 
         object_ident = args.entityId
-        obj_list = get_id_list(conn, object_ident, configuration_id, args.type, logger)
+        obj_list = get_id_list(conn, object_ident, configuration_id, args.type)
         logger.info(obj_list)
 
         for entityId in obj_list:
