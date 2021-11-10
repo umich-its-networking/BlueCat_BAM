@@ -25,65 +25,11 @@ __progname__ = "delete_deployment_options.py"
 __version__ = "0.1"
 
 
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager " + __progname__
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW")
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
-
-
 def main():
     """delete_deployment_options"""
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
-        "entityId",
+        "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
         + "IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  "
         + "or a filename with any of those on each line"
@@ -105,7 +51,7 @@ def main():
     )
 
     args = config.parse_args()
-    entityId = args.entityId
+    object_ident = args.object_ident
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
@@ -125,61 +71,10 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        id_list = get_id_list(conn, entityId, configuration_id, rangetype, logger)
-
-        for obj_id in id_list:
-            delete_deployment_option(conn, args, obj_id, logger)
-
-
-def get_id(conn, object_ident, configuration_id, rangetype, logger):
-    """get id for a particular object"""
-    id_pattern = re.compile(r"\d+$")
-    id_match = id_pattern.match(object_ident)
-    logger.info("id Match result: %s", id_match)
-    if id_match:  # an id
-        obj_id = object_ident
-    else:  # not an id
-        ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
-        ip_match = ip_pattern.match(object_ident)
-        logger.info("IP Match result: '%s'", ip_match)
-        if ip_match:  # an IP
-            logger.info("IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2))
-            object_ident = ip_match.group(1)
-            if not rangetype:
-                if ip_match.group(2) == "":
-                    rangetype = "IP4Address"
-                elif ip_match.group(2) == "-":
-                    rangetype = "DHCP4Range"
-                # "/" matches either IP4Block or IP4Network
-            if rangetype == "IP4Address":
-                obj = conn.do(
-                    "getIP4Address",
-                    method="get",
-                    containerId=configuration_id,
-                    address=object_ident,
-                )
-            else:
-                obj = get_range(conn, object_ident, configuration_id, rangetype, logger)
-            obj_id = obj.get("id")
-        else:  # not and IP or id
-            obj_id = None
-    logger.info("get_id returns %s of type %s", obj, rangetype)
-    return obj_id
-
-
-def get_id_list(conn, object_ident, configuration_id, rangetype, logger):
-    """get object, or a list of objects from a file"""
-    obj_id = get_id(conn, object_ident, configuration_id, rangetype, logger)
-    if obj_id:
-        id_list = [obj_id]
-    else:  # not an IP or id, must be a file name
-        with open(object_ident) as f:
-            id_list = [
-                get_id(conn, line.strip(), configuration_id, rangetype, logger)
-                for line in f
-                if line.strip() != ""
-            ]
-    return id_list
+        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        for obj in entity_list:
+            obj_id = obj.get('id')
+            delete_deployment_option(conn, args, obj_id)
 
 
 def getfield(obj, fieldname):
@@ -197,8 +92,9 @@ def getprop(obj, fieldname):
     return getfield(obj["properties"], fieldname)
 
 
-def delete_deployment_option(conn, args, obj_id, logger):
+def delete_deployment_option(conn, args, obj_id):
     """delete deployment options for the range"""
+    logger = logging.getLogger()
     optionlist = args.options
 
     obj = conn.do("getEntityById", id=obj_id)
@@ -232,12 +128,13 @@ def delete_deployment_option(conn, args, obj_id, logger):
             print("inherited option, cannot delete from here")
 
 
-def get_range(conn, entityId, configuration_id, rangetype, logger):
+def get_range(conn, object_ident, configuration_id, rangetype):
     """get range - block, network, or dhcp range - by ip"""
-    logger.info("get_range: %s", entityId)
+    logger = logging.getLogger()
+    logger.info("get_range: %s", object_ident)
     obj = conn.do(
         "getIPRangedByIP",
-        address=entityId,
+        address=object_ident,
         containerId=configuration_id,
         type=rangetype,
     )
