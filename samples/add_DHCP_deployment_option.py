@@ -71,91 +71,6 @@ def getserverid(server_name, configuration_id, conn):
     return server_id
 
 
-def get_range(conn, address, configuration_id, rangetype):
-    """get range - block, network, or dhcp range - by IPv4 or IPv6"""
-    logger = logging.getLogger()
-    logger.info("get_range: %s", address)
-    obj = conn.do(
-        "getIPRangedByIP", address=address, containerId=configuration_id, type=rangetype
-    )
-    # print(json.dumps(obj))
-    obj_id = obj["id"]
-
-    logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
-    if obj_id == 0:
-        print("Not found")
-        obj = None
-    else:
-        # bug in BlueCat - if Block and Network have the same CIDR,
-        # it should return the Network, but it returns the Block.
-        # So check for a matching Network.
-        if rangetype == "" and obj["type"] == "IP4Block":
-            cidr = obj["properties"]["CIDR"]
-            network_obj = conn.do(
-                "getEntityByCIDR",
-                method="get",
-                cidr=cidr,
-                parentId=obj_id,
-                type="IP4Network",
-            )
-            if network_obj["id"]:
-                obj = network_obj
-                logger.info("IP4Network found: %s", obj)
-    return obj
-
-
-def get_id(conn, object_ident, containerId, rangetype):
-    """get id for a particular object"""
-    logger = logging.getLogger()
-    id_pattern = re.compile(r"\d+$")
-    id_match = id_pattern.match(object_ident)
-    logger.info("id Match result: %s", id_match)
-    if id_match:  # an id
-        obj_id = object_ident
-    else:  # not an id
-        ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
-        ip_match = ip_pattern.match(object_ident)
-        logger.info("IP Match result: '%s'", ip_match)
-        if ip_match:  # an IP
-            logger.info("IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2))
-            object_ident = ip_match.group(1)
-            if not rangetype:
-                if ip_match.group(2) == "":
-                    rangetype = "IP4Address"
-                elif ip_match.group(2) == "-":
-                    rangetype = "DHCP4Range"
-                # "/" matches either IP4Block or IP4Network
-            if rangetype == "IP4Address":
-                obj = conn.do(
-                    "getIP4Address",
-                    method="get",
-                    containerId=containerId,
-                    address=object_ident,
-                )
-            else:
-                obj = get_range(conn, object_ident, containerId, rangetype)
-            obj_id = obj.get("id")
-        else:  # not and IP or id
-            obj_id = None
-    logger.info("get_id returns %s of type %s", obj, rangetype)
-    return obj_id
-
-
-def get_id_list(conn, object_ident, containerId, rangetype):
-    """get object, or a list of objects from a file"""
-    obj_id = get_id(conn, object_ident, containerId, rangetype)
-    if obj_id:
-        id_list = [obj_id]
-    else:  # not an IP or id, must be a file name
-        with open(object_ident) as f:
-            id_list = [
-                get_id(conn, line.strip(), containerId, rangetype)
-                for line in f
-                if line.strip() != ""
-            ]
-    return id_list
-
-
 def getfield(obj, fieldname):
     """get a field for printing"""
     field = obj.get(fieldname)
@@ -237,7 +152,7 @@ def main():
         logger.info(entity_list)
 
         for entity in entity_list:
-            entity_id = entity.get("id")
+            entity_id = entity.get('id')
             objtype = getfield(entity, "type")
             name = getfield(entity, "name")
 
