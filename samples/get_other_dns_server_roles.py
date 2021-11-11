@@ -12,10 +12,8 @@ list their DNS roles
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 import re
 
@@ -194,7 +192,7 @@ def main():
         "--exclude",
         "-x",
         nargs="*",
-        #action="append",  # causes a list of lists
+        # action="append",  # causes a list of lists
         help="server display names or hostnames to exclude, space separated",
     )
 
@@ -206,7 +204,7 @@ def main():
 
     configuration_name = args.configuration
     exclude_list = args.exclude
-    #print(exclude_list)
+    # print(exclude_list)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -238,7 +236,7 @@ def main():
             roles = conn.do("getServerDeploymentRoles", serverId=server["id"])
             for role in roles:
                 entity = conn.do("getEntityById", id=role["entityId"])
-                #print(entity)
+                # print(entity)
                 if entity["type"] in ("Zone"):  # pylint: disable=C0325
                     print(
                         server["name"],

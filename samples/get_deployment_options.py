@@ -12,9 +12,7 @@ list their deployment options
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import json
-import argparse
 import logging
 import re
 

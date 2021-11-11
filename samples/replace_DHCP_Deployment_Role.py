@@ -9,10 +9,8 @@ replace_DHCP_Deployment_Role_list.py primaryDHCPservername [failoverDHCPserverna
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 
 import bluecat_bam
@@ -58,7 +56,7 @@ def getinterfaceid(server_name, configuration_id, conn):
     )
     if len(interface_obj_list) > 1:
         print("ERROR - more than one interface found:")
-         #, json.dumps(interface_obj_list))
+        # , json.dumps(interface_obj_list))
         for obj in interface_obj_list:
             print(obj["name"])
         sys.exit(3)
@@ -132,14 +130,16 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        interface = conn.getinterface(args.primaryDHCPservername, configuration_id, conn)
+        interface = conn.getinterface(
+            args.primaryDHCPservername, configuration_id, conn
+        )
         interfaceid = interface["id"]
         logger.info("interface %s", interface)
-        #interfaceid = getinterfaceid(args.primaryDHCPservername, configuration_id, conn)
         if args.failoverDHCPservername:
-            failover_obj = conn.getinterface(args.failoverDHCPservername, configuration_id, conn)
+            failover_obj = conn.getinterface(
+                args.failoverDHCPservername, configuration_id, conn
+            )
             failover = failover_obj["id"]
-            #failover = getinterfaceid(args.failoverDHCPservername, configuration_id, conn)
             properties = "secondaryServerInterfaceId=" + str(failover) + "|"
         else:
             properties = ""
@@ -173,7 +173,7 @@ def main():
                     conn.do("delete", objectId=role["id"])
 
             roleid = add_dhcp_roles(entityId, interfaceid, properties, conn)
-            print("Network", cidr, "DHCP-roleid", roleid,"added")
+            print("Network", cidr, "DHCP-roleid", roleid, "added")
 
 
 if __name__ == "__main__":

@@ -536,7 +536,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             name_pattern = re.compile(server_name + r"\b")
             name_match = name_pattern.match(interface["name"])
             if not name_match:
-                logger.info("%s did not match %s",server_name,interface["name"])
+                logger.info("%s did not match %s", server_name, interface["name"])
                 continue
             # check which Configuration
             server_obj = conn.do("getParent", entityId=interface["id"])
@@ -545,7 +545,8 @@ class BAM(requests.Session):  # pylint: disable=R0902
                 interface_ok_list.append(interface)
         if len(interface_ok_list) > 1:
             print(
-                "ERROR - more than one interface found:" #, json.dumps(interface_ok_list)
+                "ERROR - more than one interface found:"
+                # , json.dumps(interface_ok_list)
             )
             for interface in interface_obj_list:
                 print(interface["name"])
