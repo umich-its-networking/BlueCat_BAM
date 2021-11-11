@@ -517,3 +517,73 @@ class BAM(requests.Session):  # pylint: disable=R0902
                     obj = network_obj
                     logger.info("IP4Network found: %s", obj)
         return obj
+
+    @staticmethod
+    def getinterface(server_name, configuration_id, conn):
+        """get server interface object, given the server name or interface name"""
+        interface_obj_list = conn.do(
+            "searchByObjectTypes",
+            keyword=server_name,
+            types="NetworkServerInterface",
+            start=0,
+            count=1000,  # same server can be in multiple Configurations
+        )
+        # filter for the right Configuration
+        interface_ok_list = []
+        for interface in interface_obj_list:
+            server_obj = conn.do("getParent", entityId=interface["id"])
+            server_configuration = conn.do("getParent", entityId=server_obj["id"])
+            if server_configuration["id"] == configuration_id:
+                interface_ok_list.append(interface)
+        if len(interface_ok_list) > 1:
+            print(
+                "ERROR - more than one interface found", json.dumps(interface_ok_list)
+            )
+            return None
+        interfaceid = interface_ok_list[0]["id"]
+        if interfaceid != 0:
+            return interface_ok_list[0]
+
+        # try another method, in case they gave the server display name instead
+        server_obj_list = conn.do(
+            "getEntitiesByName",
+            parentId=configuration_id,
+            name=server_name,
+            type="Server",
+            start=0,
+            count=2,  # error if more than one
+        )
+        # print(json.dumps(server_obj_list))
+        if len(server_obj_list) > 1:
+            print(
+                "ERROR - found more than one server for name",
+                server_name,
+                json.dumps(server_obj_list),
+            )
+            sys.exit(1)
+        if len(server_obj_list) < 1:
+            print("ERROR - server not found for", server_name)
+            sys.exit(1)
+        server_id = server_obj_list[0]["id"]
+        if server_id == 0:
+            print("ERROR - server not found for name", server_name)
+            sys.exit(1)
+
+        interface_obj_list = conn.do(
+            "getEntities",
+            method="get",
+            parentId=server_id,
+            type="NetworkServerInterface",
+            start=0,
+            count=1000,
+        )
+        if len(interface_obj_list) > 1:
+            print(
+                "ERROR - more than one interface found", json.dumps(interface_obj_list)
+            )
+            return None
+        interfaceid = interface_obj_list[0]["id"]
+        if interfaceid == 0:
+            print("ERROR - interface not found")
+            return None
+        return interface_obj_list[0]

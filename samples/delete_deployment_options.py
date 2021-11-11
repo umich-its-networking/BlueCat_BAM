@@ -12,11 +12,8 @@ list their deployment options
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import json
-import argparse
 import logging
-import re
 
 import bluecat_bam
 
@@ -71,9 +68,9 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
         for obj in entity_list:
-            obj_id = obj.get('id')
+            obj_id = obj.get("id")
             delete_deployment_option(conn, args, obj_id)
 
 
@@ -126,42 +123,6 @@ def delete_deployment_option(conn, args, obj_id):
                 print("result: ", result)
         else:
             print("inherited option, cannot delete from here")
-
-
-def get_range(conn, object_ident, configuration_id, rangetype):
-    """get range - block, network, or dhcp range - by ip"""
-    logger = logging.getLogger()
-    logger.info("get_range: %s", object_ident)
-    obj = conn.do(
-        "getIPRangedByIP",
-        address=object_ident,
-        containerId=configuration_id,
-        type=rangetype,
-    )
-    # print(json.dumps(obj))
-    obj_id = obj["id"]
-
-    logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
-    if obj_id == 0:
-        print("Not found")
-        obj = None
-    else:
-        # bug in BlueCat - if Block and Network have the same CIDR,
-        # it should return the Network, but it returns the Block.
-        # So check for a matching Network.
-        if rangetype == "" and obj["type"] == "IP4Block":
-            cidr = obj["properties"]["CIDR"]
-            network_obj = conn.do(
-                "getEntityByCIDR",
-                method="get",
-                cidr=cidr,
-                parentId=obj_id,
-                type="IP4Network",
-            )
-            if network_obj["id"]:
-                obj = network_obj
-                logger.info("IP4Network found: %s", obj)
-    return obj
 
 
 if __name__ == "__main__":
