@@ -9,10 +9,8 @@ add_DHCP_Deployment_Role_list.py primaryDHCPservername [failoverDHCPservername]
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 
 import bluecat_bam

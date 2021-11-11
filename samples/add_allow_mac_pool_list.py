@@ -9,10 +9,8 @@ add_allow_mac_pool_list.py list-of-mac-pools-and-allow-or-deny
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 import re
 

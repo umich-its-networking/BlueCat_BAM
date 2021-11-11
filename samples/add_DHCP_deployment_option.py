@@ -14,7 +14,6 @@ from __future__ import print_function
 import sys
 import json
 import logging
-import re
 
 import bluecat_bam
 
@@ -152,7 +151,7 @@ def main():
         logger.info(entity_list)
 
         for entity in entity_list:
-            entity_id = entity.get('id')
+            entity_id = entity.get("id")
             objtype = getfield(entity, "type")
             name = getfield(entity, "name")
 
