@@ -550,9 +550,10 @@ class BAM(requests.Session):  # pylint: disable=R0902
             for interface in interface_obj_list:
                 print(interface["name"])
             return None
-        interfaceid = interface_ok_list[0]["id"]
-        if interfaceid != 0:
-            return interface_ok_list[0]
+        if interface_ok_list:
+            interfaceid = interface_ok_list[0]["id"]
+            if interfaceid != 0:
+                return interface_ok_list[0]
 
         # try another method, in case they gave the server display name instead
         server_obj_list = conn.do(
