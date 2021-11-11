@@ -26,60 +26,6 @@ __progname__ = "get_other_dns_server_roles.py"
 __version__ = "0.1"
 
 
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager get_other_dns_server_roles.py"
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW")
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
-
-
 def getdnsservers(conn, configuration_id):
     """get list of DNS Server objects"""
     dns_server_obj_list = conn.do(
@@ -243,12 +189,12 @@ def get_network(cidr, configuration_id, conn):
 
 def main():
     """get_other_dns_server_roles.py"""
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
         "--exclude",
         "-x",
         nargs="*",
-        action="append",
+        #action="append",  # causes a list of lists
         help="server display names or hostnames to exclude, space separated",
     )
 
@@ -260,7 +206,7 @@ def main():
 
     configuration_name = args.configuration
     exclude_list = args.exclude
-    print(exclude_list)
+    #print(exclude_list)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -292,7 +238,7 @@ def main():
             roles = conn.do("getServerDeploymentRoles", serverId=server["id"])
             for role in roles:
                 entity = conn.do("getEntityById", id=role["entityId"])
-                print(entity)
+                #print(entity)
                 if entity["type"] in ("Zone"):  # pylint: disable=C0325
                     print(
                         server["name"],
@@ -321,7 +267,15 @@ def main():
                             entity["properties"]["CIDR"],
                         )
                     else:  # start/end instead of cidr
-                        print("xxx")
+                        print(
+                            server["name"],
+                            prop["fullHostName"],
+                            prop["defaultInterfaceAddress"],
+                            role["type"],
+                            entity["type"],
+                            entity["properties"]["start"],
+                            entity["properties"]["end"],
+                        )
                 elif entity["type"] in ("IP6Network", "IP6Block"):
                     print(
                         server["name"],

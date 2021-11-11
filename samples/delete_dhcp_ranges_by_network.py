@@ -24,60 +24,6 @@ __progname__ = "delete_dhcp_ranges_by_network"
 __version__ = "0.1"
 
 
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager delete_dhcp_ranges_by_network"
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW")
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
-
-
 def get_bam_api_list(conn, apiname, **kwargs):
     """wrap api call with loop to handle 'start' and 'count'"""
     if not kwargs["count"]:
@@ -242,7 +188,7 @@ def get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id):
 
 def main():
     """delete_dhcp_ranges_by_network.py"""
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
 
     args = config.parse_args()
 
