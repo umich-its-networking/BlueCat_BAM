@@ -108,7 +108,10 @@ def getinterfaceid(server_name, configuration_id, conn):
         count=1000,
     )
     if len(interface_obj_list) > 1:
-        print("ERROR - more than one interface found", json.dumps(interface_obj_list))
+        print("ERROR - more than one interface found:")
+         #, json.dumps(interface_obj_list))
+        for obj in interface_obj_list:
+            print(obj["name"])
         sys.exit(3)
     interfaceid = interface_obj_list[0]["id"]
     if interfaceid == 0:
@@ -160,7 +163,7 @@ def main():
     config = argparsecommon()
     config.add_argument("primaryDHCPservername")
     # cannot use None as a default value
-    config.add_argument("failoverDHCPservername", default="fred")
+    config.add_argument("failoverDHCPservername", default=None)
 
     args = config.parse_args()
 
@@ -180,11 +183,14 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        interfaceid = getinterfaceid(args.primaryDHCPservername, configuration_id, conn)
+        interface = conn.getinterface(args.primaryDHCPservername, configuration_id, conn)
+        interfaceid = interface["id"]
+        logger.info("interface %s", interface)
+        #interfaceid = getinterfaceid(args.primaryDHCPservername, configuration_id, conn)
         if args.failoverDHCPservername:
-            failover = getinterfaceid(
-                args.failoverDHCPservername, configuration_id, conn
-            )
+            failover_obj = conn.getinterface(args.failoverDHCPservername, configuration_id, conn)
+            failover = failover_obj["id"]
+            #failover = getinterfaceid(args.failoverDHCPservername, configuration_id, conn)
             properties = "secondaryServerInterfaceId=" + str(failover) + "|"
         else:
             properties = ""
@@ -206,9 +212,9 @@ def main():
             if not entity:
                 print("network not found", cidr)
                 continue
-            # print("found entity", json.dumps(entity))
+            logger.info("found entity %s", json.dumps(entity))
 
-            # found entityId that needs DNS roles, check for existing roles
+            # found entityId that needs DHCP roles, check for existing roles
             entityId = entity["id"]
             roles = conn.do("getDeploymentRoles", entityId=entityId)
             for role in roles:
@@ -218,7 +224,7 @@ def main():
                     conn.do("delete", objectId=role["id"])
 
             roleid = add_dhcp_roles(entityId, interfaceid, properties, conn)
-            print("Network", cidr, "DHCP-roleid", roleid)
+            print("Network", cidr, "DHCP-roleid", roleid,"added")
 
 
 if __name__ == "__main__":

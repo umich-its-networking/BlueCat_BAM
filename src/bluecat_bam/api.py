@@ -521,6 +521,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
     @staticmethod
     def getinterface(server_name, configuration_id, conn):
         """get server interface object, given the server name or interface name"""
+        logger = logging.getLogger()
         interface_obj_list = conn.do(
             "searchByObjectTypes",
             keyword=server_name,
@@ -531,14 +532,23 @@ class BAM(requests.Session):  # pylint: disable=R0902
         # filter for the right Configuration
         interface_ok_list = []
         for interface in interface_obj_list:
+            # check the name again so that "adonis1" does not match "adonis10" etc
+            name_pattern = re.compile(server_name + r"\b")
+            name_match = name_pattern.match(interface["name"])
+            if not name_match:
+                logger.info("%s did not match %s",server_name,interface["name"])
+                continue
+            # check which Configuration
             server_obj = conn.do("getParent", entityId=interface["id"])
             server_configuration = conn.do("getParent", entityId=server_obj["id"])
             if server_configuration["id"] == configuration_id:
                 interface_ok_list.append(interface)
         if len(interface_ok_list) > 1:
             print(
-                "ERROR - more than one interface found", json.dumps(interface_ok_list)
+                "ERROR - more than one interface found:" #, json.dumps(interface_ok_list)
             )
+            for interface in interface_obj_list:
+                print(interface["name"])
             return None
         interfaceid = interface_ok_list[0]["id"]
         if interfaceid != 0:
