@@ -29,7 +29,7 @@ def main():
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
         + "IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  "
-        + "or a filename with any of those on each line"
+        + "or a filename or stdin('-') with any of those on each line "
         + "unless 'type' is set to override the pattern matching",
     )
     config.add_argument(

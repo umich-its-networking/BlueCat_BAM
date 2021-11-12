@@ -432,11 +432,19 @@ class BAM(requests.Session):  # pylint: disable=R0902
 
     # @staticmethod
     def get_obj_list(self, conn, object_ident, containerId, rangetype):
-        """get object, or a list of objects from a file"""
+        """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
+        if object_ident == "-":
+            # return iterator someday ***
+            with sys.stdin as f:
+                obj_list = [
+                    self.get_obj(conn, line.strip(), containerId, rangetype)
+                    for line in f
+                    if line.strip() != ""
+                ]
+            return obj_list
         obj = self.get_obj(conn, object_ident, containerId, rangetype)
-        obj_id = obj.get("id")
-        if obj_id:
+        if obj and obj.get("id"):
             obj_list = [obj]
         else:  # not an object, must be a file name
             try:

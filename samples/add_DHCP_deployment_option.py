@@ -91,10 +91,10 @@ def main():
     """
     config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
-        "entityId",
+        "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
         + "IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  "
-        + "or a filename with any of those on each line"
+        + "or a filename or stdin('-') with any of those on each line "
         + "unless 'type' is set to override the pattern matching",
     )
     config.add_argument("optionname")
@@ -146,7 +146,7 @@ def main():
             prop["server"] = dhcpserver_id
         # print(prop)
 
-        object_ident = args.entityId
+        object_ident = args.object_ident
         entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
         logger.info(entity_list)
 

@@ -9,7 +9,6 @@ get_dhcp_ranges_by_network.py < list-of-networkIP
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 import re
@@ -187,7 +186,13 @@ def get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id):
 def main():
     """get_dhcp_ranges_by_network.py"""
     config = bluecat_bam.BAM.argparsecommon()
-
+    config.add_argument(
+        "object_ident",
+        help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
+        + "IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  "
+        + "or a filename or stdin('-') with any of those on each line "
+        + "unless 'type' is set to override the pattern matching",
+    )
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -195,7 +200,8 @@ def main():
     logger.setLevel(args.logging)
 
     configuration_name = args.configuration
-    view_name = args.view
+    object_ident = args.object_ident
+    rangetype = ""
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -207,27 +213,10 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        view_obj = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=configuration_id,
-            name=view_name,
-            type="View",
-        )
-        view_id = view_obj["id"]
+        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        logger.info("obj_list: %s", obj_list)
 
-        # now work through the zones
-        for line in sys.stdin:
-            # pattern match to cidr or zone name, fwd or rev
-            # set zone_name, and cidr if applicable
-            line = line.strip()
-
-            entity = get_entity_by_name_ip_cidr(conn, line, configuration_id, view_id)
-            if not entity:
-                print("not found", line)
-                continue
-
-            # found entityId
+        for entity in obj_list:
             entityId = entity["id"]
             cidr = entity["properties"]["CIDR"]
             print(

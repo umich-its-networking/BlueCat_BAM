@@ -10,9 +10,7 @@ get_dhcp_reserved_by_network.py < list-of-networkIP
 from __future__ import print_function
 
 import sys
-import json
 import logging
-import re
 
 import bluecat_bam
 
@@ -60,118 +58,31 @@ def get_dhcp_reserved(networkid, conn, logger):
     return reserved_list
 
 
-def zonename2cidr(zone_name):
-    """convert zone name (...in-addr.arpa) to cidr for class A,B,C"""
-    parts = zone_name.split(".")
-    parts.reverse()  # updates in place
-    partial = ".".join(parts[2:])
-    if len(parts) == 5:
-        cidr = partial + ".0/24"
-    elif len(parts) == 4:
-        cidr = partial + ".0.0/16"
-    elif len(parts) == 3:
-        cidr = partial + "0.0.0/8"
-    return cidr
-
-
-def cidr2zonename(cidr):
-    """convert CIDR to first zone name (...in-addr.arpa)"""
-    errormsg = ""
-    zone_name = ""
-    findip = re.match(r"[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}\Z", cidr)
-    if findip:
-        (ip, prefix) = cidr.split("/")
-        octets = ip.split(".")
-        if prefix <= "8":
-            zone_name = octets[0] + ".in-addr.arpa"
-        elif prefix <= "16":
-            zone_name = octets[1] + "." + octets[0] + ".in-addr.arpa"
-        elif prefix <= "24":
-            zone_name = octets[2] + "." + octets[1] + "." + octets[0] + ".in-addr.arpa"
-        else:
-            errormsg = "not a supported CIDR"
+def getfield(obj, fieldname):
+    """get a field for printing"""
+    field = obj.get(fieldname)
+    if field:
+        output = fieldname + ": " + field + ", "
     else:
-        errormsg = "not a valid CIDR"
-    return zone_name, errormsg
+        output = ""
+    return output
 
 
-def get_network(cidr, configuration_id, conn):
-    """find block or network for a CIDR"""
-    # If both block and network match, return the block
-    # bam getIPRangedByIP containerId=21216763 type=IP4Block address=10.2.1.0
-    ip = cidr.split("/")[0]  # (ip,prefix) = cidr.split("/")
-    block_obj = conn.do(
-        "getIPRangedByIP",
-        method="get",
-        containerId=configuration_id,
-        type="IP4Block",
-        address=ip,
-    )
-    # print("block_obj",json.dumps(block_obj))
-
-    if block_obj["properties"]["CIDR"] == cidr:
-        # print('found matching block',json.dumps(block_obj))
-        entity = block_obj
-    else:
-        # find network
-        network_obj = conn.do(
-            "getIPRangedByIP",
-            method="get",
-            containerId=block_obj["id"],
-            type="IP4Network",
-            address=ip,
-        )
-        network_id = network_obj["id"]
-        # print("existing network",json.dumps(network_obj))
-
-        if network_id == 0:
-            entity = {}
-        elif network_obj["properties"]["CIDR"] == cidr:
-            # print("found matching network",json.dumps(network_obj))
-            entity = network_obj
-        else:
-            entity = {}
-    return entity
-
-
-def get_zone(zone_name, view_id, conn):
-    """get zone object given zone name"""
-    # search if zone exists
-    domain_label_list = zone_name.split(".")
-
-    search_domain = domain_label_list.pop()
-    current_domain = ""
-    parent_id = view_id
-
-    while True:
-        zone = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=parent_id,
-            name=search_domain,
-            type="Zone",
-        )
-        if zone.get("id") == 0:  # do not change parent_id if zero
-            break
-        parent_id = zone.get("id")
-        current_domain = zone.get("name") + "." + current_domain
-        # print(json.dumps(domain_label_list))
-        if domain_label_list:
-            search_domain = domain_label_list.pop()
-        else:
-            search_domain = ""
-            break
-
-    if current_domain == zone_name + ".":
-        # print("found zone", json.dumps(zone))
-        return zone
-    return {}
+def getprop(obj, fieldname):
+    """get a property for printing"""
+    return getfield(obj["properties"], fieldname)
 
 
 def main():
     """get_dhcp_reserved_by_network.py"""
     config = bluecat_bam.BAM.argparsecommon()
-
+    config.add_argument(
+        "object_ident",
+        help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
+        + "IP4Network or IP4Block (n.n.n.n/...), or DHCP4Range (n.n.n.n-...).  "
+        + "or a filename or stdin('-') with any of those on each line "
+        + "unless 'type' is set to override the pattern matching",
+    )
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -179,7 +90,8 @@ def main():
     logger.setLevel(args.logging)
 
     configuration_name = args.configuration
-    view_name = args.view
+    object_ident = args.object_ident
+    rangetype = ""
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -191,64 +103,20 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        view_obj = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=configuration_id,
-            name=view_name,
-            type="View",
-        )
-        view_id = view_obj["id"]
+        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        logger.info("obj_list: %s", obj_list)
 
-        # now work through the zones
-        for line in sys.stdin:
-            # pattern match to cidr or zone name, fwd or rev
-            # set zone_name, and cidr if applicable
-            line = line.strip()
-            cidr = False
-            if ".in-addr.arpa" in line:
-                zone_name = line
-                cidr = zonename2cidr(zone_name)
-                logger.info("found in-addr: %s", line)
-            elif "/" in line:
-                cidr = line
-                zone_name, errormsg = cidr2zonename(cidr)
-                if errormsg:
-                    print("ERROR - / in line, but not valid CIDR", line)
-                    continue
-                logger.info("found /: %s", line)
-            if cidr:
-                (ip, prefix) = cidr.split("/")
-                logger.info(
-                    "CIDR %s, zone %s, ip %s, prefix %s", cidr, zone_name, ip, prefix
-                )
-
-                # find the block or network
-                entity = get_network(cidr, configuration_id, conn)
-
-                if not entity:
-                    print("network not found", line)
-                    continue
-                logger.debug("found entity %s", json.dumps(entity))
-
-            # will not be a zone in this case, but leave the generic code here
-            else:  # no cidr, so a zone name
-                zone_name = line
-
-                # search if zone exists
-                entity = get_zone(zone_name, view_id, conn)
-
-            if not entity:
-                print("not found", zone_name)
-                continue
-
-            # found entityId
+        for entity in obj_list:
             entityId = entity["id"]
 
             reserved_list = get_dhcp_reserved(entityId, conn, logger)
             # print(reserved_list)
             for ip in reserved_list:
-                print(ip)
+                name = getfield(ip, "name")
+                address = getprop(ip, "address")
+                mac = getprop(ip, "macAddress")
+                print(address, name, mac)
+                # print(ip)
 
 
 if __name__ == "__main__":
