@@ -149,5 +149,6 @@ def do_dhcp_ranges(entity, conn, offset, size):
     elif len(ranges_list) > 1:
         print("    more than one range, cannot resize")
 
+
 if __name__ == "__main__":
     main()
