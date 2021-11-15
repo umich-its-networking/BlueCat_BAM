@@ -139,9 +139,9 @@ def do_dhcp_ranges(entity, conn, offset, size):
 
             # now print ranges again
             ranges_list = get_dhcp_ranges(entityId, conn)
-            for x in ranges_list:
-                start = ipaddress.ip_address(x["properties"]["start"])
-                end = ipaddress.ip_address(x["properties"]["end"])
+            for y in ranges_list:
+                start = ipaddress.ip_address(y["properties"]["start"])
+                end = ipaddress.ip_address(y["properties"]["end"])
                 rangesize = int(end) - int(start) + 1
                 print("    new DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
     if not ranges_list:
