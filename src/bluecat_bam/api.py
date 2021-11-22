@@ -442,7 +442,9 @@ class BAM(requests.Session):  # pylint: disable=R0902
                     for line in f
                     if line.strip() != ""
                 ]
-            return obj_list
+            # remove failed entries
+            new_obj_list = [obj for obj in obj_list if obj]
+            return new_obj_list
         obj = self.get_obj(conn, object_ident, containerId, rangetype)
         if obj and obj.get("id"):
             obj_list = [obj]
@@ -454,6 +456,8 @@ class BAM(requests.Session):  # pylint: disable=R0902
                         for line in f
                         if line.strip() != ""
                     ]
+                    # remove failed entries
+                    new_obj_list = [obj for obj in obj_list if obj]
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
                 obj_list = []
@@ -493,6 +497,8 @@ class BAM(requests.Session):  # pylint: disable=R0902
             else:  # not and IP or id
                 obj = None
         logger.info("get_obj returns %s of type %s", obj, rangetype)
+        if not obj:
+            print("Warning - no object found for:", object_ident, file=sys.stderr)
         return obj
 
     @staticmethod
@@ -504,26 +510,33 @@ class BAM(requests.Session):  # pylint: disable=R0902
             "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
         )
         obj_id = obj["id"]
+        cidr = obj["properties"].get("CIDR")
+        start = obj["properties"].get("start")
 
         logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
         if obj_id == 0:
             obj = None
-        else:
-            # bug in BlueCat - if Block and Network have the same CIDR,
-            # it should return the Network, but it returns the Block.
-            # So check for a matching Network.
-            if rangetype == "" and obj["type"] == "IP4Block":
-                cidr = obj["properties"]["CIDR"]
-                network_obj = conn.do(
-                    "getEntityByCIDR",
-                    method="get",
-                    cidr=cidr,
-                    parentId=obj_id,
-                    type="IP4Network",
-                )
-                if network_obj["id"]:
-                    obj = network_obj
-                    logger.info("IP4Network found: %s", obj)
+        elif start and start != address:
+            obj = None
+        elif cidr:
+            (obj_ip, _) = cidr.split("/")
+            if obj_ip != address:
+                obj = None
+            else:
+                # bug in BlueCat - if Block and Network have the same CIDR,
+                # it should return the Network, but it returns the Block.
+                # So check for a matching Network.
+                if rangetype == "" and obj["type"] == "IP4Block":
+                    network_obj = conn.do(
+                        "getEntityByCIDR",
+                        method="get",
+                        cidr=cidr,
+                        parentId=obj_id,
+                        type="IP4Network",
+                    )
+                    if network_obj["id"]:
+                        obj = network_obj
+                        logger.info("IP4Network found: %s", obj)
         return obj
 
     @staticmethod
