@@ -90,6 +90,10 @@ if filename:
         print("--file cannot be used with --ip and --mac, use one or other")
         config.print_help()
         sys.exit(1)
+    else:
+        # read file here ****
+        print("code to read file not completed")
+        # ????
 elif not (ip and mac):
     print("either --file OR both ( --ip and --mac ) must be specified")
     config.print_help()
