@@ -89,43 +89,8 @@ view_obj = conn.do(
 )
 view_id = view_obj["id"]
 
-domain_label_list = domain_name.split(".")
+entities=conn.get_fqdn(conn,domain_name,view_id,record_type)
 
-search_domain = domain_label_list.pop()
-current_domain = ""
-parent_id = view_id
-
-while True:
-    zone = conn.do(
-        "getEntityByName",
-        method="get",
-        parentId=parent_id,
-        name=search_domain,
-        type="Zone",
-    )
-    if zone.get("id") == 0:  # do not change parent_id if zero
-        break
-    parent_id = zone.get("id")
-    current_domain = zone.get("name") + "." + current_domain
-    # print(json.dumps(domain_label_list))
-    if domain_label_list:
-        search_domain = domain_label_list.pop()
-    else:
-        search_domain = ""
-        break
-
-if record_type.lower() == "zone":
-    entities = [zone]
-else:
-    entities = conn.do(
-        "getEntitiesByName",
-        method="get",
-        parentId=parent_id,
-        name=search_domain,
-        type=record_type,
-        start=0,
-        count=1000,
-    )
 for entity in entities:
     print(json.dumps(entity))
 

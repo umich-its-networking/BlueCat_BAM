@@ -620,3 +620,55 @@ class BAM(requests.Session):  # pylint: disable=R0902
             print("ERROR - interface not found")
             return None
         return interface_obj_list[0]
+
+
+    def get_fqdn(self,conn,domain_name,view_id,record_type="HostRecord"):
+        """get list of entities with given fqdn and type"""
+        logger = logging.getLogger()
+        domain_label_list = domain_name.split(".")
+        logger.info(domain_label_list)
+        zone_end = len(domain_label_list)
+        zone_start = zone_end - 1
+        search_domain = ".".join(domain_label_list[zone_start:zone_end])
+        current_domain = ""
+        parent_id = view_id
+
+        while True:
+            logger.info("%s %s %s",zone_start,zone_end,search_domain)
+            zone = conn.do(
+                "getEntityByName",
+                method="get",
+                parentId=parent_id,
+                name=search_domain,
+                type="Zone",
+            )
+            if zone.get("id") == 0:  # try same parent, dotted name
+                if zone_start > 0:
+                    zone_start -= 1 # decrement by one
+                    search_domain = ".".join(domain_label_list[zone_start:zone_end])
+                    continue
+                break
+            parent_id = zone.get("id")
+            current_domain = ".".join(domain_label_list[zone_start:])
+            logger.info("%s %s", zone, current_domain)
+            if zone_start != 0:
+                zone_end = zone_start
+                zone_start -= 1
+                search_domain = ".".join(domain_label_list[zone_start:zone_end])
+            else:
+                search_domain = ""
+                break
+
+        if record_type.lower() == "zone":
+            entities = [zone]
+        else:
+            entities = conn.do(
+                "getEntitiesByName",
+                method="get",
+                parentId=parent_id,
+                name=search_domain,
+                type=record_type,
+                start=0,
+                count=1000,
+            )
+        return entities
