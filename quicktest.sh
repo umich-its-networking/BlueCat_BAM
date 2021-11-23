@@ -6,8 +6,8 @@ files="src/bluecat_bam/*.py tests/*.py samples/*.py *.py"
 #( set -x
 #black --check --diff $files
 echo "================= black ================"
-black $files
-echo "================= pylint ================" 
+black $files || exit 1
+echo "================= pylint ================"
 pylint $files
 echo "================= flake8 ================"
 flake8 $files
