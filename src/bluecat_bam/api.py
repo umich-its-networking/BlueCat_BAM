@@ -371,6 +371,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
     @staticmethod
     def argparsecommon():
         """set up common argparse arguments for BlueCat API"""
+        # usage: config = bluecat_bam.BAM.argparsecommon()
         config = argparse.ArgumentParser(
             description="BlueCat Address Manager add_DNS_Deployment_Role_list"
         )
@@ -422,6 +423,34 @@ class BAM(requests.Session):  # pylint: disable=R0902
             default=os.getenv("BLUECAT_LOGGING", "WARNING"),
         )
         return config
+
+    def get_config_and_view(self, configuration_name, view_name=None):
+        """get configuration_id and view_id"""
+        # usage: (configuration_id, view_id) =
+        #    conn.get_config_and_view(configuration_name, view_name)
+        # or for just configuration:
+        # (configuration_id, _) = conn.get_config_and_view(configuration_name)
+        configuration_obj = self.do(
+            "getEntityByName",
+            method="get",
+            parentId=0,
+            name=configuration_name,
+            type="Configuration",
+        )
+        configuration_id = configuration_obj["id"]
+
+        if view_name:
+            view_obj = self.do(
+                "getEntityByName",
+                method="get",
+                parentId=configuration_id,
+                name=view_name,
+                type="View",
+            )
+            view_id = view_obj["id"]
+        else:
+            view_id=None
+        return configuration_id, view_id
 
     # @staticmethod
     def get_id_list(self, conn, object_ident, containerId, rangetype):

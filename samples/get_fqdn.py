@@ -14,44 +14,10 @@ import logging
 import bluecat_bam
 
 
-config = argparse.ArgumentParser(description="get fqdn")
-config.add_argument(
-    "--server",
-    "-s",
-    # env_var="BLUECAT_SERVER",
-    default=os.getenv("BLUECAT_SERVER"),
-    help="BlueCat Address Manager hostname",
-)
-config.add_argument(
-    "--username",
-    "-u",
-    # env_var="BLUECAT_USERNAME",
-    default=os.getenv("BLUECAT_USERNAME"),
-)
-config.add_argument(
-    "--password",
-    "-p",
-    # env_var="BLUECAT_PASSWORD",
-    default=os.getenv("BLUECAT_PASSWORD"),
-    help="password in environment, should not be on command line",
-)
-config.add_argument(
-    "--configuration",
-    "--cfg",
-    help="BlueCat Configuration name",
-    default=os.getenv("BLUECAT_CONFIGURATION"),
-)
-config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW"))
+config = bluecat_bam.BAM.argparsecommon()
 config.add_argument("--type", help="DNS record type", default="HostRecord")
 config.add_argument(
     "--host", "--hostname", "--fqdn", "--dns", "-d", help="DNS domain name or hostname"
-)
-config.add_argument(
-    "--logging",
-    "-l",
-    help="log level, default WARNING (30),"
-    + "caution: level DEBUG(10) or less will show the password in the login call",
-    default=os.getenv("BLUECAT_LOGGING", "WARNING"),
 )
 args = config.parse_args()
 
@@ -68,30 +34,11 @@ if not (configuration_name and view_name and record_type and domain_name):
     config.print_help()
     sys.exit(1)
 
-conn = bluecat_bam.BAM(args.server, args.username, args.password)
+with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-configuration_obj = conn.do(
-    "getEntityByName",
-    method="get",
-    parentId=0,
-    name=configuration_name,
-    type="Configuration",
-)
+    (configuration_id, view_id) = conn.get_config_and_view(configuration_name, view_name)
 
-configuration_id = configuration_obj["id"]
+    entities=conn.get_fqdn(conn,domain_name,view_id,record_type)
 
-view_obj = conn.do(
-    "getEntityByName",
-    method="get",
-    parentId=configuration_id,
-    name=view_name,
-    type="View",
-)
-view_id = view_obj["id"]
-
-entities=conn.get_fqdn(conn,domain_name,view_id,record_type)
-
-for entity in entities:
-    print(json.dumps(entity))
-
-conn.logout()
+    for entity in entities:
+        print(json.dumps(entity))
