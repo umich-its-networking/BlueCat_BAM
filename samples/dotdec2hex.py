@@ -9,6 +9,7 @@ import sys
 import re
 import argparse
 
+
 def main():
     """CLI for dotdec2hex"""
     config = argparse.ArgumentParser(
@@ -28,22 +29,23 @@ def main():
     else:
         with sys.stdin as f:
             for line in f:
-                line = re.sub(r'(?:\r\n|\n)$', '', line, count=1)
+                line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
                 print(dotdec2hex(line))
+
 
 def dotdec2hex(dotdec):
     """convert dotted decimal to hex"""
-    hex=[]
+    hexlist = []
     for decimal in dotdec.split("."):
         d = int(decimal)
         if d < 0 or d > 255:
-            print(dotdec,"is not a valid dotted decimal")
+            print(dotdec, "is not a valid dotted decimal")
             return None
-        else:
-            h=format(d, "x")
-            hex.append(h)
-    hexout=":".join(hex)
+        h = format(d, "x")
+        hexlist.append(h)
+    hexout = ":".join(hexlist)
     return hexout
+
 
 if __name__ == "__main__":
     main()

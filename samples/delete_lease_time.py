@@ -123,12 +123,9 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        prop = {}
         dhcpserver_id = 0
         if args.dhcpserver:
             dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
-            prop["server"] = dhcpserver_id
-        # print(prop)
 
         object_ident = args.object_ident
         entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
@@ -182,16 +179,21 @@ def main():
                 serverId=-1,
             )
             logger.info(json.dumps(options))
-            print("Options are now:")
-            for option in options:
-                if optionlist and option.get("name") not in optionlist:
-                    continue
-                opt_id = getfield(option, "id")
-                objtype = getfield(option, "type")
-                name = getfield(option, "name")
-                value = getfield(option, "value")
-                inherited = getprop(option, "inherited")
-                print("    ", opt_id, objtype, name, value, inherited)
+            printoptions(options, optionlist)
+
+
+def printoptions(options, optionlist):
+    """print options"""
+    print("Options are now:")
+    for option in options:
+        if optionlist and option.get("name") not in optionlist:
+            continue
+        opt_id = getfield(option, "id")
+        objtype = getfield(option, "type")
+        name = getfield(option, "name")
+        value = getfield(option, "value")
+        inherited = getprop(option, "inherited")
+        print("    ", opt_id, objtype, name, value, inherited)
 
 
 if __name__ == "__main__":

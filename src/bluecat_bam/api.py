@@ -651,7 +651,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
         return interface_obj_list[0]
 
 
-    def get_fqdn(self,conn,domain_name,view_id,record_type="HostRecord"):
+    def get_fqdn(self,domain_name,view_id,record_type="HostRecord"):
         """get list of entities with given fqdn and type"""
         logger = logging.getLogger()
         domain_label_list = domain_name.split(".")
@@ -664,7 +664,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
 
         while True:
             logger.info("%s %s %s",zone_start,zone_end,search_domain)
-            zone = conn.do(
+            zone = self.do(
                 "getEntityByName",
                 method="get",
                 parentId=parent_id,
@@ -691,7 +691,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
         if record_type.lower() == "zone":
             entities = [zone]
         else:
-            entities = conn.do(
+            entities = self.do(
                 "getEntitiesByName",
                 method="get",
                 parentId=parent_id,
