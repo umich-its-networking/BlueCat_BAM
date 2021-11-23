@@ -38,7 +38,7 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_name, view_name
     )
 
-    entities = conn.get_fqdn(conn, domain_name, view_id, record_type)
+    entities = conn.get_fqdn(domain_name, view_id, record_type)
 
     for entity in entities:
         print(json.dumps(entity))
