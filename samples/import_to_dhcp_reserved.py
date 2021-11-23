@@ -135,9 +135,9 @@ def main():
     )
     config.add_argument(
         "--checkmac",
-        action='store_true',
+        action="store_true",
         help="verify that the mac address in the import file matches the "
-        + "mac address in the IP object, otherwise skip it"
+        + "mac address in the IP object, otherwise skip it",
     )
     args = config.parse_args()
 
@@ -163,12 +163,12 @@ def main():
         with open(args.inputfile) as f:
             for line in f:
                 line = line.strip()
-                line_d=parse_line(line,line_pat)
+                line_d = parse_line(line, line_pat)
                 if not line_d:
                     continue
 
                 # find in range data
-                ip_obj=ip_dict.get(line_d["ip"])
+                ip_obj = ip_dict.get(line_d["ip"])
                 if not ip_obj:
                     logger.info("not found in range, so create new")
 
@@ -197,7 +197,9 @@ def main():
 
                     old_state = ip_obj["properties"]["state"]
                     if old_state in ("DHCP_ALLOCATED", "STATIC"):
-                        update_dhcp_allocated(conn, ip_obj, line_d["mac"], line_d["name"])
+                        update_dhcp_allocated(
+                            conn, ip_obj, line_d["mac"], line_d["name"]
+                        )
 
                     elif old_state == "DHCP_FREE":
                         replace_dhcp_free(
@@ -212,43 +214,52 @@ def main():
                         )
 
                     elif old_state == "DHCP_RESERVED":
-                        update_dhcp_reserved(conn, ip_obj, line_d["mac"], line_d["name"])
+                        update_dhcp_reserved(
+                            conn, ip_obj, line_d["mac"], line_d["name"]
+                        )
 
                     else:
                         print("error - cannot handle state:", old_state)
 
                 # fqdn
-                if line_d['fqdn']:
-                    fqdn_objs = conn.get_fqdn(line_d['fqdn'],view_id)
-                    if fqdn_objs:
-                        if len(fqdn_objs) > 1:
-                            print("error, more than one fqdn found, please fix by hand",line)
-                        else:
-                            fqdn=fqdn_objs[0]
-                            fqdn_id=fqdn['id']
-                            if line_d['ip'] != fqdn['properties']['addresses']:
-                                print("address mismatch?  fix by hand",line)
-                                print("to match", fqdn)
-                    else:
-                        fqdn_id = conn.do(
-                            "addHostRecord",
-                            absoluteName=line_d['fqdn'],
-                            addresses=line_d['ip'],
-                            ttl=-1,
-                            viewId = view_id,
-                        )
-                        fqdn=conn.do(
-                            "getEntityById",
-                            id=fqdn_id,
-                        )
-                    print(fqdn)
-
+                do_fqdn(conn, line_d["fqdn"], line_d["ip"], view_id, line)
 
                 final_ip_obj = conn.do("getEntityById", id=ip_obj["id"])
                 print(final_ip_obj)
 
 
-def parse_line(line,line_pat):
+def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
+    """check or create host record"""
+    if line_fqdn:
+        fqdn_objs = conn.get_fqdn(line_fqdn, view_id)
+        if fqdn_objs:
+            if len(fqdn_objs) > 1:
+                print(
+                    "error, more than one fqdn found, please fix by hand",
+                    line,
+                )
+            else:
+                fqdn = fqdn_objs[0]
+                fqdn_id = fqdn["id"]
+                if line_ip != fqdn["properties"]["addresses"]:
+                    print("address mismatch?  fix by hand", line)
+                    print("to match", fqdn)
+        else:
+            fqdn_id = conn.do(
+                "addHostRecord",
+                absoluteName=line_fqdn,
+                addresses=line_ip,
+                ttl=-1,
+                viewId=view_id,
+            )
+            fqdn = conn.do(
+                "getEntityById",
+                id=fqdn_id,
+            )
+        print(fqdn)
+
+
+def parse_line(line, line_pat):
     """parse the imput line into a dict"""
     logger = logging.getLogger()
     if line == "":  # skip blank lines
@@ -259,17 +270,19 @@ def parse_line(line,line_pat):
         print("did not find IP and delimiter in line:", line)
         return None
     delimiter = line_match.group(2)
-    if delimiter:       # if line had only the ip and no delimiter
-        delimiter=","   # just need some delimiter for split
+    if delimiter:  # if line had only the ip and no delimiter
+        delimiter = ","  # just need some delimiter for split
     line_d = dict(
         itertools.zip_longest(
             ["ip", "mac", "name", "fqdn", "other"], line.split(delimiter, 5)
         )
     )
-    if line_d['fqdn']:
-        dom_match=re.match(r'^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$',line_d['fqdn'])
+    if line_d["fqdn"]:
+        dom_match = re.match(
+            r"^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$", line_d["fqdn"]
+        )
         if not dom_match:
-            print("not a valid domain name:",line_d['fqdn'])
+            print("not a valid domain name:", line_d["fqdn"])
             return None
     logger.info("ip,mac,name,fqdn,other: %s", line_d)
     return line_d
@@ -290,21 +303,21 @@ def make_ip_dict(conn, object_ident, configuration_id):
     return ip_dict
 
 
-def get_either_mac(line_mac, conn, configuration_id, ip_obj,  args):
+def get_either_mac(line_mac, conn, configuration_id, ip_obj, args):
     """get mac from input line or from existing IP object"""
     logger = logging.getLogger()
-    logger.info("line_mac %s",line_mac)
-    ip_obj_mac=ip_obj["properties"].get("macAddress")
+    logger.info("line_mac %s", line_mac)
+    ip_obj_mac = ip_obj["properties"].get("macAddress")
     logger.info("ip_obj_mac %s", ip_obj_mac)
     if line_mac:
         if ip_obj_mac and args.checkmac and line_mac != ip_obj_mac:
             print("error --checkmac specified but mac addresses do nto match")
-            print("mac address from input line:",line_mac)
-            print("mac address from ip object: ",ip-obj_mac)
+            print("mac address from input line:", line_mac)
+            print("mac address from ip object: ", ip_obj_mac)
             return None
-        mac_obj=get_mac(conn, configuration_id, line_mac)
+        mac_obj = get_mac(conn, configuration_id, line_mac)
         if mac_obj:
-            print("found mac",mac_obj)
+            print("found mac", mac_obj)
     else:  # no mac in import data, find in bam
         if ip_obj_mac:
             line_mac = ip_obj_mac

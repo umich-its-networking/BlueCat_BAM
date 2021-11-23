@@ -5,10 +5,8 @@
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
 import json
-import argparse
 import logging
 
 import bluecat_bam
@@ -36,9 +34,11 @@ if not (configuration_name and view_name and record_type and domain_name):
 
 with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-    (configuration_id, view_id) = conn.get_config_and_view(configuration_name, view_name)
+    (configuration_id, view_id) = conn.get_config_and_view(
+        configuration_name, view_name
+    )
 
-    entities=conn.get_fqdn(conn,domain_name,view_id,record_type)
+    entities = conn.get_fqdn(conn, domain_name, view_id, record_type)
 
     for entity in entities:
         print(json.dumps(entity))

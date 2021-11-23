@@ -449,7 +449,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             )
             view_id = view_obj["id"]
         else:
-            view_id=None
+            view_id = None
         return configuration_id, view_id
 
     # @staticmethod
@@ -650,8 +650,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             return None
         return interface_obj_list[0]
 
-
-    def get_fqdn(self,domain_name,view_id,record_type="HostRecord"):
+    def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
         """get list of entities with given fqdn and type"""
         logger = logging.getLogger()
         domain_label_list = domain_name.split(".")
@@ -663,7 +662,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
         parent_id = view_id
 
         while True:
-            logger.info("%s %s %s",zone_start,zone_end,search_domain)
+            logger.info("%s %s %s", zone_start, zone_end, search_domain)
             zone = self.do(
                 "getEntityByName",
                 method="get",
@@ -673,7 +672,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             )
             if zone.get("id") == 0:  # try same parent, dotted name
                 if zone_start > 0:
-                    zone_start -= 1 # decrement by one
+                    zone_start -= 1  # decrement by one
                     search_domain = ".".join(domain_label_list[zone_start:zone_end])
                     continue
                 break
