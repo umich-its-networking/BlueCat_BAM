@@ -278,6 +278,8 @@ def parse_line(line, line_pat):
         )
     )
     if line_d["fqdn"]:
+        # pattern from:
+        # https://www.geeksforgeeks.org/how-to-validate-a-domain-name-using-regular-expression/
         dom_match = re.match(
             r"^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$", line_d["fqdn"]
         )
