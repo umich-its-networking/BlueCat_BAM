@@ -13,12 +13,13 @@ import argparse
 def main():
     """CLI for dotdec2hex"""
     config = argparse.ArgumentParser(
-        description="BlueCat Address Manager add_DNS_Deployment_Role_list"
+        description="convert dotted decimal to hex (used for MAC Addresses)"
+        + "  Example:  255.136.199.204.44.54 -> ff:88:c7:cc:2c:36"
     )
     config.add_argument(
         "dotdec",
         nargs="*",
-        help="dotted decimal",
+        help="dotted decimal (if no argument, reads from the command line)",
     )
 
     args = config.parse_args()
