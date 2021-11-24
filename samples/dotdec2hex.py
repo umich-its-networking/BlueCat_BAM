@@ -29,6 +29,7 @@ def main():
     else:
         with sys.stdin as f:
             for line in f:
+                # remove line ending cr / lf
                 line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
                 print(dotdec2hex(line))
 
