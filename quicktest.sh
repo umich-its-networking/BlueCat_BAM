@@ -8,11 +8,12 @@ files="src/bluecat_bam/*.py tests/*.py samples/*.py *.py"
 echo "================= black ================"
 black $files || exit 1
 echo "================= pylint ================"
-pylint $files
+pylint $files || exit 1
 echo "================= flake8 ================"
-flake8 $files
+flake8 $files || exit 1
 echo "================= bandit ================"
-bandit $files
+bandit $files || exit 1
 echo "================= pytest ================"
-pytest
+pytest || exit 1
 #)
+echo "done"
