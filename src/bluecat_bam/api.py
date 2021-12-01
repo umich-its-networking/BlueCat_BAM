@@ -474,7 +474,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
-        obj = self.get_obj(conn, object_ident, containerId, rangetype)
+        obj = self.get_obj(conn, object_ident, containerId, rangetype, warn=False)
         if obj and obj.get("id"):
             obj_list = [obj]
         else:  # not an object, must be a file name
@@ -485,15 +485,18 @@ class BAM(requests.Session):  # pylint: disable=R0902
                         for line in f
                         if line.strip() != ""
                     ]
-                    # remove failed entries
-                    new_obj_list = [obj for obj in obj_list if obj]
+                # remove failed entries
+                logger.info(obj_list)
+                new_obj_list = [obj for obj in obj_list if obj]
+                logger.info(new_obj_list)
+                return new_obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
                 obj_list = []
         return obj_list
 
     # @staticmethod
-    def get_obj(self, conn, object_ident, containerId, rangetype):
+    def get_obj(self, conn, object_ident, containerId, rangetype, warn=True):
         """get an object, given an id, IP, CIDR, or range"""
         logger = logging.getLogger()
         id_pattern = re.compile(r"\d+$")
@@ -526,7 +529,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             else:  # not and IP or id
                 obj = None
         logger.info("get_obj returns %s of type %s", obj, rangetype)
-        if not obj:
+        if not obj and warn:
             print("Warning - no object found for:", object_ident, file=sys.stderr)
         return obj
 
