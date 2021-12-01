@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import logging
 import ipaddress
-from operator import itemgetter, attrgetter
 
 import bluecat_bam
 
@@ -64,8 +63,7 @@ def make_ip_dict(conn, object_ident, configuration_id):
         entityId = entity["id"]
         matching_list = get_ip_list(entityId, conn)
         for ip in matching_list:
-            ip_address = ip["properties"]["address"]
-            ip_dict[ip_address] = ip
+            ip_dict[ip["properties"]["address"]] = ip
     return ip_dict
 
 
@@ -113,23 +111,10 @@ def main():
             ip_obj_list = get_ip_list(networkid, conn)
             ip_dict = {}
             for ip in ip_obj_list:
-                ip_address = ip["properties"]["address"]
-                ip_dict[ip_address] = ip
+                ip_dict[ip["properties"]["address"]] = ip
 
-            range_list=get_dhcp_ranges(networkid, conn)
-            range_info_list=get_dhcp_ranges_info(range_list)
-
-            """
-            state_counts = {}
-            for obj in ip_obj_list:
-                state = obj["properties"].get("state")
-                if not state:
-                    state = "None"
-                if state_counts.get(state):
-                    state_counts[state] += 1
-                else:
-                    state_counts[state] = 1
-            """
+            range_list = get_dhcp_ranges(networkid, conn)
+            range_info_list = get_dhcp_ranges_info(range_list)
 
             # print(network)
             cidr = network["properties"]["CIDR"]
@@ -137,69 +122,68 @@ def main():
             netsize = ipaddress.IPv4Network(cidr).num_addresses
             print("%s size of Network: %s\t%s" % (netsize, network["name"], cidr))
             print_dhcp_ranges(networkid, conn)
-            """
-            # for state,count in state_counts.items(): # unsorted
-            for state in sorted(state_counts.keys()):
-                count = state_counts[state]
-                print(count, state)
-            """
 
-
-            (count_in,count_out)=count_network(network_net,range_info_list,ip_dict)
-            print("in ranges:")
-            for state in sorted(count_in.keys()):
-                count = count_in[state]
-                print(count, state)
-            print("outside ranges:")
-            for state in sorted(count_out.keys()):
-                count = count_out[state]
-                print(count, state)
-
+            (count_in, count_out) = count_network(network_net, range_info_list, ip_dict)
+            print_counts(count_in, count_out)
             print("")
 
-def count_network(network_net,range_info_list,ip_dict):
+
+def print_counts(count_in, count_out):
+    """print counts"""
+    print("in ranges:")
+    for state in sorted(count_in.keys()):
+        count = count_in[state]
+        print(count, state)
+    print("outside ranges:")
+    for state in sorted(count_out.keys()):
+        count = count_out[state]
+        print(count, state)
+
+
+def count_network(network_net, range_info_list, ip_dict):
+    """count states in a network"""
     # in_range=False    # future - count in each range
     i = 0
-    if i < len(range_info_list):
-        range_info = range_info_list[i]
-        rangestart=range_info['start']
-        rangeend=range_info["end"]
-    else:
-        rangestart=network_net.broadcast_address
-        rangeend=rangestart
-    count_in={}    # in DHCP ranges
-    count_out={}    # out of DHCP ranges
+    (rangestart, rangeend) = get_info(i, range_info_list, network_net)
+    count_in = {}  # in DHCP ranges
+    count_out = {}  # out of DHCP ranges
     for ip in network_net.hosts():
         entity = ip_dict.get(str(ip))
         if entity:
-            prop=ip_dict[str(ip)].get("properties")
+            prop = ip_dict[str(ip)].get("properties")
             if prop:
-                state=prop.get("state")
+                state = prop.get("state")
             else:
-                state="noprop"
+                state = "noprop"
         else:
-            state="Free"
+            state = "Free"
         # check if in a DHCP range
         while ip > rangeend:
             i += 1
-            if i < len(range_info_list):
-                range_info = range_info_list[i]
-                rangestart=range_info['start']
-                rangeend=range_info["end"]
-            else:
-                rangestart=network_net.broadcast_address
-                rangeend=rangestart
-        if ip >= rangestart:    # in range
+            (rangestart, rangeend) = get_info(i, range_info_list, network_net)
+        if ip >= rangestart:  # in range
             if count_in.get(state):
                 count_in[state] += 1
             else:
                 count_in[state] = 1
-        else:   # not in a DHCP range
+        else:  # not in a DHCP range
             if count_out.get(state):
                 count_out[state] += 1
             else:
-                    count_out[state] = 1
-    return (count_in,count_out)
+                count_out[state] = 1
+    return (count_in, count_out)
+
+
+def get_info(i, range_info_list, network_net):
+    """get the info on this dhcp_range"""
+    if i < len(range_info_list):
+        range_info = range_info_list[i]
+        rangestart = range_info["start"]
+        rangeend = range_info["end"]
+    else:
+        rangestart = network_net.broadcast_address
+        rangeend = rangestart
+    return (rangestart, rangeend)
 
 
 def print_dhcp_ranges(networkid, conn):
@@ -214,7 +198,6 @@ def print_dhcp_ranges(networkid, conn):
         print("    DHCP_range: none")
 
 
-
 def get_dhcp_ranges_info(range_list):
     """return sorted list of dict with the start and end IP ipaddress objects
     and the range object, like:
@@ -223,14 +206,15 @@ def get_dhcp_ranges_info(range_list):
         ...
     ]"""
     logger = logging.getLogger()
-    range_info_list=[]
-    for range in range_list:
-        start = ipaddress.ip_address(range["properties"]["start"])
-        end = ipaddress.ip_address(range["properties"]["end"])
-        range_info_list.append({"start": start, "end": end, "range": range})
-    # print(range_info_list)
-    range_info_list.sort(key=lambda self: self['start'])
+    range_info_list = []
+    for dhcp_range in range_list:
+        start = ipaddress.ip_address(dhcp_range["properties"]["start"])
+        end = ipaddress.ip_address(dhcp_range["properties"]["end"])
+        range_info_list.append({"start": start, "end": end, "range": dhcp_range})
+    logger.info(range_info_list)
+    range_info_list.sort(key=lambda self: self["start"])
     return range_info_list
+
 
 def get_dhcp_ranges(networkid, conn):
     """get list of ranges"""
