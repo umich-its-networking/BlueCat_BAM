@@ -106,7 +106,8 @@ def main():
             filtered_list = get_ip_info(entityId, conn, states)
             # print(filtered_list)
             for ip in filtered_list:
-                # format was: "address: %-15s  state: %-14s  mac: %-17s  leaseTime: %-21s  expiryTime: %-21s  name: %s"
+                # format was: "address: %-15s  state: %-14s  mac: %-17s
+                # leaseTime: %-21s  expiryTime: %-21s  name: %s"
                 print(
                     "%-15s  %-14s  %-17s  %-21s  %-21s  %s"
                     % (
@@ -118,7 +119,7 @@ def main():
                         ip["name"],
                     )
                 )
-                #print(ip)
+                # print(ip)
                 logger.info(ip)
 
 
