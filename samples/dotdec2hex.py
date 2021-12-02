@@ -43,7 +43,7 @@ def dotdec2hex(dotdec):
         if d < 0 or d > 255:
             print(dotdec, "is not a valid dotted decimal")
             return None
-        h = format(d, "x")
+        h = format(d, "02x")
         hexlist.append(h)
     hexout = ":".join(hexlist)
     return hexout
