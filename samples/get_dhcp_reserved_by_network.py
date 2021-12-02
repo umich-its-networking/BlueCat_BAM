@@ -58,21 +58,6 @@ def get_dhcp_reserved(networkid, conn, logger):
     return reserved_list
 
 
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + field + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
-
-
 def main():
     """get_dhcp_reserved_by_network.py"""
     config = bluecat_bam.BAM.argparsecommon()
@@ -112,11 +97,15 @@ def main():
             reserved_list = get_dhcp_reserved(entityId, conn, logger)
             # print(reserved_list)
             for ip in reserved_list:
-                name = getfield(ip, "name")
-                address = getprop(ip, "address")
-                mac = getprop(ip, "macAddress")
-                print(address, name, mac)
-                # print(ip)
+                print(
+                    "address: %-15s  mac: %s  name: %s"
+                    % (
+                        ip["properties"]["address"],
+                        ip["properties"]["macAddress"],
+                        ip["name"],
+                    )
+                )
+                logger.info(ip)
 
 
 if __name__ == "__main__":
