@@ -241,7 +241,7 @@ def main():
                 )
                 print("added dhcp range, id=", result)
             except requests.exceptions.HTTPError as e:
-                print("ERROR adding dhcp range:",e)
+                print("ERROR adding dhcp range:", e)
 
             # print("Ranges:")
             ranges_list = get_dhcp_ranges(entityId, conn, logger)

@@ -32,48 +32,52 @@ if not (configuration_name and view_name):
     config.print_help()
     sys.exit(1)
 
-with bluecat_bam.BAM("https://bluecat-test-2.umnet.umich.edu:9999", args.username, args.password) as conn:
+with bluecat_bam.BAM(
+    "https://bluecat-test-2.umnet.umich.edu:9999", args.username, args.password
+) as conn:
 
     (configuration_id, view_id) = conn.get_config_and_view(
         configuration_name, view_name
     )
 
     # open second conn to test server with data to copy
-    with bluecat_bam.BAM("https://bluecat-test-2.umnet.umich.edu:6666",args.username, args.password) as conn2:
+    with bluecat_bam.BAM(
+        "https://bluecat-test-2.umnet.umich.edu:6666", args.username, args.password
+    ) as conn2:
         (configuration_id2, view_id2) = conn2.get_config_and_view(
             configuration_name, view_name
         )
 
         for line in sys.stdin:
-            domain_name = line.rstrip('\r\n')
+            domain_name = line.rstrip("\r\n")
 
             entities = conn.get_fqdn(domain_name, view_id, record_type)
 
             if len(entities) != 1:
-                print("not on prod:",entities,domain_name)
+                print("not on prod:", entities, domain_name)
             else:
                 entity_curr = entities[0]
-                print("current:",json.dumps(entity_curr))
+                print("current:", json.dumps(entity_curr))
 
             entities = conn2.get_fqdn(domain_name, view_id, record_type)
 
             if len(entities) != 1:
-                print("not on test:",entities,domain_name)
+                print("not on test:", entities, domain_name)
                 continue
             entity_old = entities[0]
-            print("old:",json.dumps(entity_old))
+            print("old:", json.dumps(entity_old))
 
-            if entity_curr['id'] != entity_old['id']:
-                print("ids do not match, skip:",domain_name)
+            if entity_curr["id"] != entity_old["id"]:
+                print("ids do not match, skip:", domain_name)
                 continue
             result = conn.do("update", body=entity_old)
             if result:
-                print("update result:",result)
+                print("update result:", result)
 
             entities = conn.get_fqdn(domain_name, view_id, record_type)
 
             if len(entities) != 1:
-                print("failed update:",entities,domain_name)
+                print("failed update:", entities, domain_name)
                 continue
             entity_check = entities[0]
-            print("check:",json.dumps(entity_check))
+            print("check:", json.dumps(entity_check))
