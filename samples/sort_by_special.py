@@ -65,7 +65,7 @@ def main():
         print(line)
 
 
-def sort_by_special(lines, regex, sort_type):
+def sort_by_special(lines, regex, sort_type):  # pylint: disable=R0912
     """sort_by_special"""
     decorated = []  # decorated list to sort
     # get a line
@@ -85,7 +85,7 @@ def sort_by_special(lines, regex, sort_type):
 
         # find type
         if sort_type == "text":
-            sortkey = match
+            sort_key = match
         elif sort_type == "number":
             s = re.search(r"(\d+(\.\d*|))(?\D)", line)
             if s:
@@ -136,11 +136,11 @@ def canonical_mac(mac):
     """reformat mac address to be sure there are always two hex digits"""
     hex_list = mac.split(":")
     out_list = []
-    for hex in hex_list:
-        if len(hex) == 1:
-            hex = "0" + hex
-        # h = format(hex, "02x")
-        out_list.append(hex)
+    for h in hex_list:
+        if len(h) == 1:
+            h = "0" + h
+        # h = format(h, "02x")
+        out_list.append(h)
     hexout = ":".join(out_list)
     return hexout
 
