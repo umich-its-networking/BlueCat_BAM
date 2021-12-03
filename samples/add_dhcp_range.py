@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import ipaddress
+import requests
 
 import bluecat_bam
 
@@ -230,14 +231,17 @@ def main():
             )
             # print(entity)
 
-            result = conn.do(
-                "addDHCP4Range",
-                networkId=entityId,
-                start=args.start,
-                end=args.end,
-                properties="",
-            )
-            print("added dhcp range, id=", result)
+            try:
+                result = conn.do(
+                    "addDHCP4Range",
+                    networkId=entityId,
+                    start=args.start,
+                    end=args.end,
+                    properties="",
+                )
+                print("added dhcp range, id=", result)
+            except requests.exceptions.HTTPError as e:
+                print("ERROR adding dhcp range:",e)
 
             # print("Ranges:")
             ranges_list = get_dhcp_ranges(entityId, conn, logger)

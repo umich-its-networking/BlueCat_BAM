@@ -11,6 +11,7 @@ from __future__ import print_function
 
 import logging
 import ipaddress
+import requests
 
 import bluecat_bam
 
@@ -112,14 +113,17 @@ def main():
                 rangesize = netsize + size - offset
             else:
                 rangesize = size
-            result = conn.do(
-                "addDHCP4RangeBySize",
-                networkId=entityId,
-                offset=offset,
-                size=rangesize,
-                properties="",
-            )
-            print("added dhcp range, id=", result)
+            try:
+                result = conn.do(
+                    "addDHCP4RangeBySize",
+                    networkId=entityId,
+                    offset=offset,
+                    size=rangesize,
+                    properties="",
+                )
+                print("added dhcp range, id=", result)
+            except requests.exceptions.HTTPError as e:
+                print("ERROR adding dhcp range:",e)
 
             print_dhcp_ranges(entityId, conn)
 
