@@ -55,21 +55,6 @@ def get_ip_list(networkid, conn):
     return ip_list
 
 
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + field + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
-
-
 def set_name(conn, ip_obj, name):
     """set name"""
     if name:
