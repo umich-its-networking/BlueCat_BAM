@@ -611,10 +611,11 @@ class BAM(requests.Session):  # pylint: disable=R0902
 
         # try another method, in case they gave the server display name instead
         server_obj_list = conn.do(
-            "getEntitiesByName",
+            "getEntitiesByNameUsingOptions",
             parentId=configuration_id,
             name=server_name,
             type="Server",
+            options="ignoreCase=true",
             start=0,
             count=2,  # error if more than one
         )
@@ -694,11 +695,12 @@ class BAM(requests.Session):  # pylint: disable=R0902
             entities = [zone]
         else:
             entities = self.do(
-                "getEntitiesByName",
+                "getEntitiesByNameUsingOptions",
                 method="get",
                 parentId=parent_id,
                 name=search_domain,
                 type=record_type,
+                options="ignoreCase=true",
                 start=0,
                 count=1000,
             )

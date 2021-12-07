@@ -86,6 +86,9 @@ def main():
     rangetype = ""
     offset = int(args.offset)
     size = int(args.size)
+    if size == 0:
+        print("ERROR - size cannot be zero")
+        return
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -130,10 +133,15 @@ def do_dhcp_ranges(entity, conn, offset, size):
                 rangesize = size
             network_ip = ipaddress.IPv4Network(cidr).network_address
             new_start = network_ip + offset
-            new_end = network_ip + offset + rangesize
+            new_end = network_ip + offset + rangesize - 1
             newrange = str(new_start) + "-" + str(new_end)
             print("new start, end", new_start, new_end, newrange)
-            result = conn.do("resizeRange", objectId=x["id"], range=newrange)
+            result = conn.do(
+                "resizeRange",
+                objectId=x["id"],
+                range=newrange,
+                convertOrphanedIPAddressesTo="UNALLOCATED",
+            )
             if result:
                 print(result)
 
