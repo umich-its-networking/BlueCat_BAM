@@ -66,6 +66,30 @@ def set_name(conn, ip_obj, name):
     return ip_obj
 
 
+def do_checkonly(counts, line, line_mac, ip_obj, obj_mac, obj_state):
+    """checkonly mode"""
+    logger = logging.getLogger()
+    logger.info(
+        "line_mac %s, ip_obj %s, obj_state %s", line_mac, json.dumps(ip_obj), obj_state
+    )
+    if not ip_obj:
+        print(line, "not in BlueCat")
+        counts["importonly"] += 1
+    elif not line_mac:
+        print(line, "no mac in import")
+        counts["importnomac"] += 1
+    elif obj_state in ("DHCP_ALLOCATED", "DHCP_RESERVED"):
+        if obj_mac and line_mac == obj_mac:
+            print(line, "MAC Address matches")
+            counts["macsame"] += 1
+        else:
+            print(line, "MAC Address different")
+            counts["macdiff"] += 1
+    else:
+        print(line, "free in BlueCat")
+        counts["dhcpfree"] += 1
+
+
 def make_dhcp_reserved(conn, ip, mac, name, fqdn, configuration_id, view_id):
     """make dchp reserved"""
     logger = logging.getLogger()
@@ -100,6 +124,13 @@ def make_dhcp_reserved(conn, ip, mac, name, fqdn, configuration_id, view_id):
     return ip_obj
 
 
+def canonical_mac(mac):
+    """convert MAC Address to lowercase with no punctuation
+    so that it can be compared to another MAC Address"""
+    cmac = "".join([c.lower() for c in mac if c in "0123456789abcdefABCDEF"])
+    return cmac
+
+
 def main():
     """import_to_dhcp_reserved.py"""
     config = bluecat_bam.BAM.argparsecommon()
@@ -124,6 +155,12 @@ def main():
         help="verify that the mac address in the import file matches the "
         + "mac address in the IP object, otherwise skip it",
     )
+    config.add_argument(
+        "--checkonly",
+        action="store_true",
+        help="verify that the IP and mac addresses in the import file match"
+        + " the BAM, but do not change anything.",
+    )
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -136,6 +173,14 @@ def main():
         )
 
         ip_dict = make_ip_dict(conn, args.object_ident, configuration_id)
+        logger.info("ip_dict %s", json.dumps(ip_dict))
+        counts = {
+            "importonly": 0,
+            "importnomac": 0,
+            "macdiff": 0,
+            "macsame": 0,
+            "dhcpfree": 0,
+        }
 
         # {"id": 17396816, "name": "MYPC-1450", "type": "IP4Address",
         # "properties": {"address": "10.0.1.244", "state":
@@ -148,69 +193,117 @@ def main():
         with open(args.inputfile) as f:
             for line in f:
                 line = line.strip()
+
+                # get import file info
                 line_d = parse_line(line, line_pat)
                 if not line_d:
                     continue
+                line_mac = canonical_mac(line_d["mac"])
 
-                # find in range data
+                # get BlueCat info
                 ip_obj = ip_dict.get(line_d["ip"])
                 if not ip_obj:
-                    logger.info("not found in range, so create new")
-
-                    if not line_d["mac"]:
-                        print("no MAC Address in BlueCat or input line:", line)
-                        continue
-
-                    ip_obj = make_dhcp_reserved(
-                        conn,
-                        line_d["ip"],
-                        line_d["mac"],
-                        line_d["name"],
-                        line_d["fqdn"],
-                        configuration_id,
-                        view_id,
-                    )
+                    obj_mac = None
+                    obj_state = None
+                    logger.info("ip %s not found in ip_dict", line_d["ip"])
                 else:
-                    # convert and update existing IP
-
-                    # first get mac address object
-                    line_d["mac"] = get_either_mac(
-                        line_d["mac"], conn, configuration_id, ip_obj, args
+                    obj_mac = canonical_mac(ip_obj["properties"].get("macAddress"))
+                    obj_state = ip_obj["properties"].get("state")
+                    logger.info(
+                        "found ip %s in ip_dict, mac %s, state %s",
+                        line_d["ip"],
+                        obj_mac,
+                        obj_state,
                     )
-                    if not line_d["mac"]:
-                        continue
 
-                    old_state = ip_obj["properties"]["state"]
-                    if old_state in ("DHCP_ALLOCATED", "STATIC"):
-                        update_dhcp_allocated(
-                            conn, ip_obj, line_d["mac"], line_d["name"]
-                        )
+                # possible conditions:
+                # ip in import file, but not BlueCat (create new)
+                # ip is DHCP_ALLOCATED or DHCP_RESERVED and:
+                #      mac is different (warn, update if forced?)
+                #      mac is same (update other info)
+                # ip is DHCP_FREE or other (update)
 
-                    elif old_state == "DHCP_FREE":
-                        replace_dhcp_free(
-                            conn,
-                            ip_obj,
-                            line_d["ip"],
-                            line_d["mac"],
-                            line_d["name"],
-                            line_d["fqdn"],
-                            configuration_id,
-                            view_id,
-                        )
+                # for checkonly mode:
+                # import file does not have mac - warn and skip
+                # ip in import file, but not BlueCat - warn
+                # ip is DHCP_ALLOCATED or DHCP_RESERVED and:
+                #      mac is different - error
+                #      mac is same - ok
+                # ip is DHCP_FREE or other - warn
 
-                    elif old_state == "DHCP_RESERVED":
-                        update_dhcp_reserved(
-                            conn, ip_obj, line_d["mac"], line_d["name"]
-                        )
+                if args.checkonly:
+                    do_checkonly(counts, line, line_mac, ip_obj, obj_mac, obj_state)
+                    continue
 
-                    else:
-                        print("error - cannot handle state:", old_state)
+                # not in checkonly node, take action
+                do_action(
+                    conn,
+                    ip_obj,
+                    line,
+                    line_d,
+                    line_mac,
+                    obj_state,
+                    configuration_id,
+                    view_id,
+                    args,
+                )
 
-                # fqdn
-                do_fqdn(conn, line_d["fqdn"], line_d["ip"], view_id, line)
 
-                final_ip_obj = conn.do("getEntityById", id=ip_obj["id"])
-                print(final_ip_obj)
+def do_action(
+    conn, ip_obj, line, line_d, line_mac, obj_state, configuration_id, view_id, args
+):
+    """update or add dhcp reserved"""
+    logger = logging.getLogger()
+    if not ip_obj:
+        logger.info("not found in range, so create new")
+
+        if not line_mac:
+            print("no MAC Address in BlueCat or input line:", line)
+            return
+
+        ip_obj = make_dhcp_reserved(
+            conn,
+            line_d["ip"],
+            line_mac,
+            line_d["name"],
+            line_d["fqdn"],
+            configuration_id,
+            view_id,
+        )
+    else:
+        # convert and update existing IP
+
+        # first get mac address object
+        line_mac = get_either_mac(line_mac, conn, configuration_id, ip_obj, args)
+        if not line_mac:
+            print("ERROR - no mac in import or BlueCat")
+            return
+        if obj_state in ("DHCP_ALLOCATED", "STATIC"):
+            update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
+
+        elif obj_state == "DHCP_FREE":
+            replace_dhcp_free(
+                conn,
+                ip_obj,
+                line_d["ip"],
+                line_mac,
+                line_d["name"],
+                line_d["fqdn"],
+                configuration_id,
+                view_id,
+            )
+
+        elif obj_state == "DHCP_RESERVED":
+            update_dhcp_reserved(conn, ip_obj, line_mac, line_d["name"])
+
+        else:
+            print("error - cannot handle state:", obj_state)
+
+    # fqdn
+    do_fqdn(conn, line_d["fqdn"], line_d["ip"], view_id, line)
+
+    final_ip_obj = conn.do("getEntityById", id=ip_obj["id"])
+    print(final_ip_obj)
 
 
 def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
@@ -227,8 +320,12 @@ def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
                 fqdn = fqdn_objs[0]
                 fqdn_id = fqdn["id"]
                 if line_ip != fqdn["properties"]["addresses"]:
+                    fqdn["properties"]["addresses"] = line_ip
+                    result = conn.do("update", body=fqdn)
+                    if result:
+                        print("host record update result: ", result)
                     print("address mismatch?  fix by hand", line)
-                    print("to match", fqdn)
+                    print("to match", json.dumps(fqdn))
         else:
             fqdn_id = conn.do(
                 "addHostRecord",
@@ -245,7 +342,7 @@ def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
 
 
 def parse_line(line, line_pat):
-    """parse the imput line into a dict"""
+    """parse the input line into a dict"""
     logger = logging.getLogger()
     if line == "":  # skip blank lines
         return None
@@ -271,7 +368,7 @@ def parse_line(line, line_pat):
         if not dom_match:
             print("not a valid domain name:", line_d["fqdn"])
             return None
-    logger.info("ip,mac,name,fqdn,other: %s", line_d)
+    logger.info("ip,mac,name,fqdn,other: %s", json.dumps(line_d))
     return line_d
 
 
@@ -279,7 +376,7 @@ def make_ip_dict(conn, object_ident, configuration_id):
     """make ip dict"""
     logger = logging.getLogger()
     obj_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
-    logger.info("obj_list: %s", obj_list)
+    logger.info("obj_list: %s", json.dumps(obj_list))
     ip_dict = {}
     for entity in obj_list:
         entityId = entity["id"]
@@ -294,11 +391,11 @@ def get_either_mac(line_mac, conn, configuration_id, ip_obj, args):
     """get mac from input line or from existing IP object"""
     logger = logging.getLogger()
     logger.info("line_mac %s", line_mac)
-    ip_obj_mac = ip_obj["properties"].get("macAddress")
+    ip_obj_mac = canonical_mac(ip_obj["properties"].get("macAddress"))
     logger.info("ip_obj_mac %s", ip_obj_mac)
     if line_mac:
         if ip_obj_mac and args.checkmac and line_mac != ip_obj_mac:
-            print("error --checkmac specified but mac addresses do nto match")
+            print("error --checkmac specified but mac addresses do not match")
             print("mac address from input line:", line_mac)
             print("mac address from ip object: ", ip_obj_mac)
             return None
@@ -342,7 +439,7 @@ def update_dhcp_allocated(conn, ip_obj, line_mac, line_name):
         "getEntityById",
         id=ip_obj["id"],
     )
-    logger.info("new %s", new_ip_obj)
+    logger.info("new %s", json.dumps(new_ip_obj))
     ip_obj = new_ip_obj
 
     # update the name (cannot be done in the above API)
@@ -354,7 +451,7 @@ def replace_dhcp_free(
     conn, ip_obj, line_ip, line_mac, line_name, line_fqdn, configuration_id, view_id
 ):
     """replace dhcp free"""
-    # cannot convert directly to reserved, delete, and recreate
+    # cannot convert directly to reserved, so delete, and recreate
     result = conn.do(
         "delete",
         objectId=ip_obj["id"],
