@@ -12,7 +12,6 @@ automatically excluded from DHCP ranges
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import logging
 import re
 import argparse
@@ -52,21 +51,21 @@ def ip2bogusmac(ip):
     in the form fe:ff:XX:XX:XX:XX"""
     logger = logging.getLogger()
     logger.info(ip)
-    m=re.search(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})",ip)
+    m = re.search(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip)
     logger.info(m.lastindex)
     if m.lastindex == 4:
-        hexlist = ["fe","ff"]
+        hexlist = ["fe", "ff"]
         for g in m.groups():
             d = int(g)
             if d < 0 or d > 255:
-                print(dotdec, "is not a valid dotted decimal")
+                print(d, "is not a valid dotted decimal")
                 return None
             h = format(d, "02x")
             hexlist.append(h)
-            logger.info("dec %s, hex %s",d,h)
+            logger.info("dec %s, hex %s", d, h)
         hexout = ":".join(hexlist)
     else:
-        hexout=None
+        hexout = None
     return hexout
 
 
