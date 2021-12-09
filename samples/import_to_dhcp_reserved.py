@@ -324,8 +324,7 @@ def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
                     result = conn.do("update", body=fqdn)
                     if result:
                         print("host record update result: ", result)
-                    print("address mismatch?  fix by hand", line)
-                    print("to match", json.dumps(fqdn))
+                    print("updated", json.dumps(fqdn))
         else:
             fqdn_id = conn.do(
                 "addHostRecord",
