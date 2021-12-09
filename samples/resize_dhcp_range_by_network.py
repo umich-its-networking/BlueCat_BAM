@@ -140,7 +140,7 @@ def do_dhcp_ranges(entity, conn, offset, size):
                 "resizeRange",
                 objectId=x["id"],
                 range=newrange,
-                convertOrphanedIPAddressesTo="UNALLOCATED",
+                options="convertOrphanedIPAddressesTo=UNALLOCATED",
             )
             if result:
                 print(result)
