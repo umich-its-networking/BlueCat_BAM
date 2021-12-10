@@ -20,36 +20,13 @@ __progname__ = "import_to_dhcp_reserved"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_ip_list(networkid, conn):
     """get list of IP objects"""
     logger = logging.getLogger()
-    ip_list = get_bam_api_list(
-        conn,
+    ip_list = conn.get_bam_api_list(
         "getEntities",
         parentId=networkid,
         type="IP4Address",
-        start=0,
-        count=1000,
     )
     logger.debug(ip_list)
     return ip_list
