@@ -18,68 +18,16 @@ __progname__ = "count_states_by_network"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_ip_list(networkid, conn):
     """get list of IP objects"""
     logger = logging.getLogger()
-    ip_list = get_bam_api_list(
-        conn,
+    ip_list = conn.get_bam_api_list(
         "getEntities",
         parentId=networkid,
         type="IP4Address",
-        start=0,
-        count=1000,
     )
     logger.debug(ip_list)
     return ip_list
-
-
-def make_ip_dict(conn, object_ident, configuration_id):
-    """make ip dict"""
-    logger = logging.getLogger()
-    obj_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
-    logger.info("obj_list: %s", obj_list)
-    ip_dict = {}
-    for entity in obj_list:
-        entityId = entity["id"]
-        matching_list = get_ip_list(entityId, conn)
-        for ip in matching_list:
-            ip_dict[ip["properties"]["address"]] = ip
-    return ip_dict
-
-
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + field + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
 
 
 def main():
@@ -121,7 +69,7 @@ def main():
             network_net = ipaddress.IPv4Network(cidr)
             netsize = ipaddress.IPv4Network(cidr).num_addresses
             print("%s size of Network: %s\t%s" % (netsize, network["name"], cidr))
-            print_dhcp_ranges(networkid, conn)
+            print_dhcp_ranges(range_info_list)
 
             (count_in, count_out) = count_network(network_net, range_info_list, ip_dict)
             print_counts(count_in, count_out)
@@ -186,15 +134,14 @@ def get_info(i, range_info_list, network_net):
     return (rangestart, rangeend)
 
 
-def print_dhcp_ranges(networkid, conn):
+def print_dhcp_ranges(range_info_list):
     """print dhcp ranges"""
-    ranges_list = get_dhcp_ranges(networkid, conn)
-    for x in ranges_list:
-        start = ipaddress.ip_address(x["properties"]["start"])
-        end = ipaddress.ip_address(x["properties"]["end"])
+    for x in range_info_list:
+        start = ipaddress.ip_address(x["start"])
+        end = ipaddress.ip_address(x["end"])
         rangesize = int(end) - int(start) + 1
         print("%s size of DHCP_range: %s-%s" % (rangesize, start, end))
-    if not ranges_list:
+    if not range_info_list:
         print("    DHCP_range: none")
 
 
@@ -219,13 +166,10 @@ def get_dhcp_ranges_info(range_list):
 def get_dhcp_ranges(networkid, conn):
     """get list of ranges"""
     logger = logging.getLogger()
-    range_list = get_bam_api_list(
-        conn,
+    range_list = conn.get_bam_api_list(
         "getEntities",
         parentId=networkid,
         type="DHCP4Range",
-        start=0,
-        count=1000,
     )
     logger.debug(range_list)
     return range_list
