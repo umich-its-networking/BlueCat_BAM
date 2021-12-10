@@ -113,7 +113,13 @@ def main():
             reserved_list = get_dhcp_reserved(entityId, conn)
             for ip in reserved_list:
                 print_ip(ip)
-                result = conn.do("delete", objectId=ip["id"])
+                # result = conn.do("delete", objectId=ip["id"])
+                result = conn.do(
+                    "deleteWithOptions",
+                    method="delete",
+                    objectId=ip["id"],
+                    options="noServerUpdate=true|deleteOrphanedIPAddresses=true|",
+                )
                 if result:
                     print("result: ", result)
 
