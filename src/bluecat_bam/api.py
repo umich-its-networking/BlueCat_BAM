@@ -452,14 +452,30 @@ class BAM(requests.Session):  # pylint: disable=R0902
             view_id = None
         return configuration_id, view_id
 
-    # @staticmethod
+    def get_bam_api_list(self, apiname, **kwargs):
+        """wrap api call with loop to handle 'start' and 'count'"""
+        if not kwargs.get("count"):
+            kwargs["count"] = 1000
+        if not kwargs.get("start"):
+            kwargs["start"] = 0
+        count = kwargs["count"]
+        replysize = count
+        listall = []
+        start = 0
+        while replysize == count:
+            kwargs["start"] = start
+            listone = self.do(apiname, **kwargs)
+            replysize = len(listone)
+            start += replysize
+            listall.extend(listone)
+        return listall
+
     def get_id_list(self, conn, object_ident, containerId, rangetype):
         """get object id, or a list of objects from a file"""
         obj_list = self.get_obj_list(conn, object_ident, containerId, rangetype)
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
-    # @staticmethod
     def get_obj_list(self, conn, object_ident, containerId, rangetype):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
@@ -495,7 +511,6 @@ class BAM(requests.Session):  # pylint: disable=R0902
                 obj_list = []
         return obj_list
 
-    # @staticmethod
     def get_obj(self, conn, object_ident, containerId, rangetype, warn=True):
         """get an object, given an id, IP, CIDR, or range"""
         logger = logging.getLogger()
