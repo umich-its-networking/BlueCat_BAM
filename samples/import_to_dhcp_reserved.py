@@ -9,6 +9,7 @@ inputfile format:  IP,MAC,name,fqdn
 # to be python2/3 compatible:
 from __future__ import print_function
 
+import sys
 import logging
 import re
 import json
@@ -151,16 +152,16 @@ def main():
             args.configuration, args.view
         )
 
-        network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+        network_list = conn.get_obj_list(conn, args.object_ident, configuration_id, "")
         logger.info("network_list: %s", json.dumps(network_list))
         if len(network_list) > 1:
             print("ERROR - cannot handle more than one network", file=sys.stderr)
             raise ValueError
-        network_obj=network_list[0]
+        network_obj = network_list[0]
 
-        ip_list = get_ip_list(entityId, conn)
-        ip_dict=make_ip_dict(ip_list)
-        logger.info("ip_dict %s", json.dumps(ip_dict))
+        ip_list = get_ip_list(network_obj["id"], conn)
+        ip_dict = make_ip_dict(ip_list)
+        logger.info("ip_dict %s", ip_dict)
         counts = {
             "importonly": 0,
             "importnomac": 0,
@@ -188,7 +189,7 @@ def main():
                 line_mac = canonical_mac(line_d["mac"])
 
                 # get BlueCat info
-                ip_obj = ip_dict.get(line_d["ip"])
+                ip_obj = ip_dict.get(ipaddress.ip_address(line_d["ip"]))
                 if not ip_obj:
                     obj_mac = None
                     obj_state = None
@@ -360,6 +361,7 @@ def parse_line(line, line_pat):
 
 def make_ip_dict(ip_list):
     """get IP objects in network and put iin dict with Python ipaddress obj as key"""
+    ip_dict = {}
     for ip_obj in ip_list:
         ip_address = ipaddress.ip_address(ip_obj["properties"]["address"])
         ip_dict[ip_address] = ip_obj
