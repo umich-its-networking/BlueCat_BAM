@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 """
-import_to_dhcp_reserved.py < output-from-arubaIntermapperSnmp
+import_to_dhcp_reserved.py object_ident inputfile
+inputfile format:  IP,MAC,name,fqdn
 """
 
 
@@ -12,6 +13,7 @@ import logging
 import re
 import json
 import itertools
+import ipaddress
 
 import bluecat_bam
 
@@ -149,7 +151,15 @@ def main():
             args.configuration, args.view
         )
 
-        ip_dict = make_ip_dict(conn, args.object_ident, configuration_id)
+        network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+        logger.info("network_list: %s", json.dumps(network_list))
+        if len(network_list) > 1:
+            print("ERROR - cannot handle more than one network", file=sys.stderr)
+            raise ValueError
+        network_obj=network_list[0]
+
+        ip_list = get_ip_list(entityId, conn)
+        ip_dict=make_ip_dict(ip_list)
         logger.info("ip_dict %s", json.dumps(ip_dict))
         counts = {
             "importonly": 0,
@@ -348,18 +358,11 @@ def parse_line(line, line_pat):
     return line_d
 
 
-def make_ip_dict(conn, object_ident, configuration_id):
-    """make ip dict"""
-    logger = logging.getLogger()
-    obj_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
-    logger.info("obj_list: %s", json.dumps(obj_list))
-    ip_dict = {}
-    for entity in obj_list:
-        entityId = entity["id"]
-        matching_list = get_ip_list(entityId, conn)
-        for ip in matching_list:
-            ip_address = ip["properties"]["address"]
-            ip_dict[ip_address] = ip
+def make_ip_dict(ip_list):
+    """get IP objects in network and put iin dict with Python ipaddress obj as key"""
+    for ip_obj in ip_list:
+        ip_address = ipaddress.ip_address(ip_obj["properties"]["address"])
+        ip_dict[ip_address] = ip_obj
     return ip_dict
 
 
