@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-resize_dhcp_ranges_by_network.py < list-of-networkIP
+resize_dhcp_ranges_by_network.py object_ident offset size
 [--cfg configuration] [--view viewname]
 """
 
@@ -19,36 +19,13 @@ __progname__ = "resize_dhcp_ranges_by_network"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_dhcp_ranges(networkid, conn):
     """get list of ranges"""
     logger = logging.getLogger()
-    range_list = get_bam_api_list(
-        conn,
+    range_list = conn.get_bam_api_list(
         "getEntities",
         parentId=networkid,
         type="DHCP4Range",
-        start=0,
-        count=1000,
     )
     logger.debug(range_list)
     return range_list
@@ -114,7 +91,7 @@ def main():
 
 
 def do_dhcp_ranges(entity, conn, offset, size):
-    """print dhcp ranges"""
+    """resize dhcp ranges"""
     entityId = entity["id"]
     ranges_list = get_dhcp_ranges(entityId, conn)
     for x in ranges_list:
