@@ -461,7 +461,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
         count = kwargs["count"]
         replysize = count
         listall = []
-        start = 0
+        start = kwargs["start"]
         while replysize == count:
             kwargs["start"] = start
             listone = self.do(apiname, **kwargs)
