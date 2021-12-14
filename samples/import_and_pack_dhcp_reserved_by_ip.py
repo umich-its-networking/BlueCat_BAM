@@ -39,9 +39,9 @@ def make_mac_dict(ip_list):
     """make dict with mac address as the key"""
     mac_dict = {}
     for ip_obj in ip_list:
-        mac=ip_obj["properties"].get("macAddress")
+        mac = ip_obj["properties"].get("macAddress")
         if mac:
-            mac_dict[mac]=ip_obj
+            mac_dict[mac] = ip_obj
     return mac_dict
 
 
@@ -142,8 +142,8 @@ def canonical_mac(mac):
     if isinstance(mac, str):
         cmac = "".join([c.lower() for c in mac if c in "0123456789abcdefABCDEF"])
     else:
-        cmac=mac
-        logger.info("failed to canonicalize mac ",mac)
+        cmac = mac
+        logger.info("failed to canonicalize mac ", mac)
     return cmac
 
 
@@ -287,8 +287,15 @@ def main():
                 from_ip = current_ip
                 # logger.info("import %s" % (current_ip))
                 print("keep %s at %s" % (from_ip, current_ip))
-            match_to_existing(current_ip,
-                line_d, ip_dict, conn, args.checkonly, configuration_id, view_id, args
+            match_to_existing(
+                current_ip,
+                line_d,
+                ip_dict,
+                conn,
+                args.checkonly,
+                configuration_id,
+                view_id,
+                args,
             )
 
             current_ip += step
@@ -296,8 +303,8 @@ def main():
             print("ERROR: left over %s" % (import_dict))  # should be empty
 
 
-def match_to_existing(current_ip,
-    line_d, ip_dict, conn, checkonly, configuration_id, view_id, args
+def match_to_existing(
+    current_ip, line_d, ip_dict, conn, checkonly, configuration_id, view_id, args
 ):
     """compare import and existing data, then add or update"""
     logger = logging.getLogger()
@@ -362,7 +369,15 @@ def match_to_existing(current_ip,
 
 
 def do_action(
-    conn, current_ip, ip_obj, line_d, line_mac, obj_state, configuration_id, view_id, args
+    conn,
+    current_ip,
+    ip_obj,
+    line_d,
+    line_mac,
+    obj_state,
+    configuration_id,
+    view_id,
+    args,
 ):
     """update or add dhcp reserved"""
     logger = logging.getLogger()

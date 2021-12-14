@@ -39,9 +39,9 @@ def make_mac_dict(ip_list):
     """make dict with mac address as the key"""
     mac_dict = {}
     for ip_obj in ip_list:
-        mac=ip_obj["properties"].get("macAddress")
+        mac = ip_obj["properties"].get("macAddress")
         if mac:
-            mac_dict[mac]=ip_obj
+            mac_dict[mac] = ip_obj
     return mac_dict
 
 
@@ -63,10 +63,10 @@ def parse_file(inputfile):
             if not line_d:
                 continue
             ip_import_dict[ipaddress.ip_address(line_d["ip"])] = line_d
-            mac=line_d["mac"]
+            mac = line_d["mac"]
             if mac:
                 mac_import_dict[canonical_mac(mac)] = line_d
-    return ip_import_dict,mac_import_dict
+    return ip_import_dict, mac_import_dict
 
 
 def set_name(conn, ip_obj, name):
@@ -146,8 +146,8 @@ def canonical_mac(mac):
     if isinstance(mac, str):
         cmac = "".join([c.lower() for c in mac if c in "0123456789abcdefABCDEF"])
     else:
-        cmac=mac
-        logger.info("failed to canonicalize mac ",mac)
+        cmac = mac
+        logger.info("failed to canonicalize mac ", mac)
     return cmac
 
 
@@ -244,7 +244,7 @@ def main():
         # only ip is required
         # delimiter can be comma, tab, or space
         # "other..." fields are ignored
-        ip_import_dict,mac_import_dict = parse_file(args.inputfile)
+        ip_import_dict, mac_import_dict = parse_file(args.inputfile)
         # logger.info(ip_import_dict)
 
         # decide on first and last IP, and step direction
@@ -270,63 +270,86 @@ def main():
         # (can make it more efficient later)
         current_ip = first_ip
         needed = len(mac_import_dict)
-        later_ip_list=[]
+        later_ip_list = []
         while current_ip != last_ip and needed > 0:
             logger.info("current %s", current_ip)
-            skip=False
+            skip = False
             ip_obj = ip_dict.get(current_ip)
             if ip_obj:
-                mac=ip_obj["properties"].get("macAddress")
+                mac = ip_obj["properties"].get("macAddress")
                 if mac:
                     line_d = mac_import_dict.pop(canonical_mac(mac), None)
                     if line_d:
                         print("keep %s at %s" % (current_ip, current_ip))
-                        match_to_existing(current_ip,
-                            line_d, ip_obj, conn, args.checkonly, configuration_id, view_id, args
+                        match_to_existing(
+                            current_ip,
+                            line_d,
+                            ip_obj,
+                            conn,
+                            args.checkonly,
+                            configuration_id,
+                            view_id,
+                            args,
                         )
                         needed -= 1
-                    else:   # no matching mac in import data
-                        if ip_obj['properties']['state'] not in ('DHCP_RESERVED', 'DHCP_ALLOCATED', 'RESERVED'):
+                    else:  # no matching mac in import data
+                        if ip_obj["properties"]["state"] not in (
+                            "DHCP_RESERVED",
+                            "DHCP_ALLOCATED",
+                            "RESERVED",
+                        ):
                             needed -= 1
-                            print("use later",current_ip)
+                            print("use later", current_ip)
                             later_ip_list.append(current_ip)
                         else:
-                            print("skip",current_ip)
-                            skip=True
+                            print("skip", current_ip)
+                            skip = True
                 else:
-                    if ip_obj['properties']['state'] not in ('DHCP_RESERVED', 'DHCP_ALLOCATED', 'RESERVED'):
+                    if ip_obj["properties"]["state"] not in (
+                        "DHCP_RESERVED",
+                        "DHCP_ALLOCATED",
+                        "RESERVED",
+                    ):
                         needed -= 1
-                        print("use later",current_ip)
+                        print("use later", current_ip)
                         later_ip_list.append(current_ip)
                     else:
-                        print("skip",current_ip)
-                        skip=True
+                        print("skip", current_ip)
+                        skip = True
             else:
                 needed -= 1
-                print("use later",current_ip)
+                print("use later", current_ip)
                 later_ip_list.append(current_ip)
             current_ip += step
-        logger.warning("remaining in mac_import_dict: %s",sorted(mac_import_dict.keys()))
-
+        logger.warning(
+            "remaining in mac_import_dict: %s", sorted(mac_import_dict.keys())
+        )
 
         # now walk through the later list and fill in
-        index=0
+        index = 0
         for mac in mac_import_dict.keys():
-            line_d=mac_import_dict[mac]
-            print("mac, line_d",mac,line_d)
+            line_d = mac_import_dict[mac]
+            print("mac, line_d", mac, line_d)
             current_ip = later_ip_list[index]
-            from_ip=line_d['ip']
+            from_ip = line_d["ip"]
             print("move %s to %s" % (from_ip, current_ip))
-            ip_obj=ip_dict.get(current_ip)
-            print("index, current_ip, ip_obj",current_ip, ip_obj)
-            match_to_existing(current_ip,
-                line_d, ip_obj, conn, args.checkonly, configuration_id, view_id, args
+            ip_obj = ip_dict.get(current_ip)
+            print("index, current_ip, ip_obj", current_ip, ip_obj)
+            match_to_existing(
+                current_ip,
+                line_d,
+                ip_obj,
+                conn,
+                args.checkonly,
+                configuration_id,
+                view_id,
+                args,
             )
             index += 1
 
 
-def match_to_existing(current_ip,
-    line_d, ip_obj, conn, checkonly, configuration_id, view_id, args
+def match_to_existing(
+    current_ip, line_d, ip_obj, conn, checkonly, configuration_id, view_id, args
 ):
     """compare import and existing data, then add or update"""
     logger = logging.getLogger()
@@ -390,7 +413,15 @@ def match_to_existing(current_ip,
 
 
 def do_action(
-    conn, current_ip, ip_obj, line_d, line_mac, obj_state, configuration_id, view_id, args
+    conn,
+    current_ip,
+    ip_obj,
+    line_d,
+    line_mac,
+    obj_state,
+    configuration_id,
+    view_id,
+    args,
 ):
     """update or add dhcp reserved"""
     logger = logging.getLogger()
@@ -466,7 +497,7 @@ def do_fqdn(conn, current_ip, line_fqdn, line_ip, view_id, line_d):
                     result = conn.do("update", body=fqdn)
                     if result:
                         print("host record update result: ", result)
-                    #print("updated", json.dumps(fqdn))
+                    # print("updated", json.dumps(fqdn))
         else:
             fqdn_id = conn.do(
                 "addHostRecord",
