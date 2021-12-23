@@ -89,7 +89,9 @@ def main():
     """
     get_lease_time.py entityId
     """
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Get lease times (min, default, max) for Network(s)"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "

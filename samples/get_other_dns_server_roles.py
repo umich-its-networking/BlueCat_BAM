@@ -187,7 +187,9 @@ def get_network(cidr, configuration_id, conn):
 
 def main():
     """get_other_dns_server_roles.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Find all DNS Deployment Roles for servers of type Other"
+    )
     config.add_argument(
         "--exclude",
         "-x",

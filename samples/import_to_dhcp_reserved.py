@@ -113,7 +113,7 @@ def canonical_mac(mac):
 
 def main():
     """import_to_dhcp_reserved.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon("Create DHCP Reserved from import list")
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "

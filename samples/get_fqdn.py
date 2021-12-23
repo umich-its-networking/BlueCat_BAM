@@ -12,7 +12,7 @@ import logging
 import bluecat_bam
 
 
-config = bluecat_bam.BAM.argparsecommon()
+config = bluecat_bam.BAM.argparsecommon("Get fully qualified domain name object")
 config.add_argument("--type", help="DNS record type", default="HostRecord")
 config.add_argument(
     "--host", "--hostname", "--fqdn", "--dns", "-d", help="DNS domain name or hostname"

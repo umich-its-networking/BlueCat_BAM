@@ -33,7 +33,9 @@ def get_dhcp_ranges(networkid, conn):
 
 def main():
     """resize_dhcp_ranges_by_network.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Resize DHCP Range given Network, offset, and size"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "

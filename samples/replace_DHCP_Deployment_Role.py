@@ -107,7 +107,7 @@ def get_network(network_ip, configuration_id, conn):
 
 def main():
     """replace DNS Deployment Role list"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon("replace DNS Deployment Role list")
     config.add_argument("primaryDHCPservername")
     # cannot use None as a default value
     config.add_argument("failoverDHCPservername", default=None)
