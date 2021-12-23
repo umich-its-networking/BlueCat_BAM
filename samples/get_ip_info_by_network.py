@@ -60,7 +60,7 @@ def get_ip_info(networkid, conn, states):
 
 def main():
     """get_ip_info_by_network.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon("Get IP info for a whole Network")
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -75,6 +75,12 @@ def main():
         + "like DHCP_RESERVED"
         + " - see API manual for the API state names. "
         + "(default is to get all)",
+    )
+    config.add_argument(
+        "--hostnames",
+        default=False,
+        action="store_true",
+        help="return a list of hostnames for each IP, if any",
     )
     args = config.parse_args()
 
@@ -108,8 +114,23 @@ def main():
             for ip in filtered_list:
                 # format was: "address: %-15s  state: %-14s  mac: %-17s
                 # leaseTime: %-21s  expiryTime: %-21s  name: %s"
+                hostname_out = ""
+                hostname_list = []
+                if args.hostnames:
+                    hostrec_list = conn.do(
+                        "getLinkedEntities",
+                        entityId=ip["id"],
+                        type="HostRecord",
+                        start=0,
+                        count=1000,
+                    )
+                    for hostrecord_obj in hostrec_list:
+                        hostname_list.append(
+                            hostrecord_obj["properties"]["absoluteName"]
+                        )
+                    hostname_out = "  " + " ".join(hostname_list)
                 print(
-                    "%-15s  %-14s  %-17s  %-21s  %-21s  %s"
+                    "%-15s  %-14s  %-17s  %-21s  %-21s  %s%s"
                     % (
                         ip["properties"].get("address"),
                         ip["properties"].get("state"),
@@ -117,6 +138,7 @@ def main():
                         ip["properties"].get("leaseTime"),
                         ip["properties"].get("expiryTime"),
                         ip["name"],
+                        hostname_out,
                     )
                 )
                 # print(ip)
