@@ -45,7 +45,9 @@ def get_ip_list(networkid, conn):
 
 def main():
     """resize_dhcp_range_by_active.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Resize DHCP Range to cover all DHCP_ALLOCATED and DHCP_RESERVED IP's"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -76,7 +78,6 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    configuration_name = args.configuration
     object_ident = args.object_ident
     rangetype = "IP4Network"
     free = int(args.free)
@@ -114,19 +115,25 @@ def do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive):
         broadcast_ip,
     )
 
-    # find lowest dhcp range
+    # get dhcp range
     lowest_dhcp = broadcast_ip
     ranges_list = get_dhcp_ranges(networkid, conn)
-    for x in ranges_list:
-        start = ipaddress.ip_address(x["properties"]["start"])
-        end = ipaddress.ip_address(x["properties"]["end"])
+    if len(ranges_list) > 1:
+        print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
+        return
+    if len(ranges_list) == 1:
+        range_obj = ranges_list[0]
+        start = ipaddress.ip_address(range_obj["properties"]["start"])
+        end = ipaddress.ip_address(range_obj["properties"]["end"])
         rangesize = int(end) - int(start) + 1
         print("    previous DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
         if start < lowest_dhcp:
             lowest_dhcp = start
+    else:
+        range_obj = None
     logger.info("lowest_dhcp: %s", lowest_dhcp)
 
-    # find limits of active IP's (DHCP_RESERVED, DHCP_ALLOCATED) (static?)
+    # find limits of active IP's (DHCP_ALLOCATED) (static?)
     ip_list = get_ip_list(networkid, conn)
     lowest_active = broadcast_ip
     highest_active = network_ip
@@ -137,7 +144,8 @@ def do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive):
             ip_obj["properties"]["address"],
             ip_obj["properties"]["state"],
         )
-        if ip_obj["properties"]["state"] in ("DHCP_RESERVED", "DHCP_ALLOCATED"):
+        # need to make dhcp reserved inclusion optional ****
+        if ip_obj["properties"]["state"] in ("DHCP_ALLOCATED", "DHCP_RESERVED"):
             active += 1
             ip_address = ipaddress.ip_address(ip_obj["properties"]["address"])
             if ip_address < lowest_active:
@@ -152,8 +160,8 @@ def do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive):
     # choose outer limits
     if onlyactive and active > 0:
         start = lowest_active
-    else:
-        start = min(lowest_dhcp, lowest_active)
+    elif range and start > lowest_active:
+        start = lowest_active
     end = min(highest_active, start - 1)
     range_size = int(end) - int(start) + 1
 
@@ -193,17 +201,15 @@ def do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive):
 
     # decide new range
     if end < start:
-        print("no dhcp range due to no active an no free requested")
+        print("no dhcp range due to no active and no free requested")
     else:
         newrange = str(start) + "-" + str(end)
         print("new start, end, active, dhcpfree", start, end, active, free)
 
-        if len(ranges_list) > 1:
-            print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
-        elif not checkonly:
+        if not checkonly:
             result = conn.do(
                 "resizeRange",
-                objectId=x["id"],
+                objectId=range_obj["id"],
                 range=newrange,
                 options="convertOrphanedIPAddressesTo=UNALLOCATED",
             )
