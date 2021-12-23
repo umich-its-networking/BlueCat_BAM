@@ -59,6 +59,7 @@ import argparse
 import os
 import re
 import requests
+import ipaddress
 
 
 # double underscore names
@@ -72,7 +73,7 @@ except NameError:
     basestring = str  # pylint: disable=invalid-name,redefined-builtin
 
 
-class BAM(requests.Session):  # pylint: disable=R0902
+class BAM(requests.Session):  # pylint: disable=R0902,R0904
     """subclass requests and
     redefine requests.request to a simpler BlueCat interface"""
 
@@ -91,6 +92,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
         self.password = password
         self.timeout = timeout
         self.raw = bool(raw)
+        self.parentviewcache = {}  # zoneid: viewid
         logging.info("raw: %s", self.raw)
         self.raw_in = bool(raw_in)
         logging.info("raw_in: %s", self.raw_in)
@@ -369,12 +371,10 @@ class BAM(requests.Session):  # pylint: disable=R0902
         return method_from_wadl
 
     @staticmethod
-    def argparsecommon():
+    def argparsecommon(description=""):
         """set up common argparse arguments for BlueCat API"""
         # usage: config = bluecat_bam.BAM.argparsecommon()
-        config = argparse.ArgumentParser(
-            description="BlueCat Address Manager add_DNS_Deployment_Role_list"
-        )
+        config = argparse.ArgumentParser(description=description)
         config.add_argument(
             "--server",
             "-s",
@@ -720,3 +720,93 @@ class BAM(requests.Session):  # pylint: disable=R0902
                 count=1000,
             )
         return entities
+
+    def delete_ip_obj(self, ip_obj):
+        """delete ip obj, handle case of DHCP_ALLOCATED"""
+        ip_id = ip_obj["id"]
+        if ip_obj["properties"]["state"] == "DHCP_ALLOCATED":
+            # change to dhcp reserved with a fake mac address, then delete
+            # use random self-assigned mac address like fedcba987654
+            # in case the existing mac already has a dhcp reserved entry
+            result = self.do(
+                "changeStateIP4Address",
+                addressId=ip_id,
+                targetState="MAKE_DHCP_RESERVED",
+                macAddress="fedcba987654",
+            )
+            if result:
+                return result
+        result = self.do(
+            "deleteWithOptions",
+            method="delete",
+            objectId=ip_id,
+            options="noServerUpdate=true|deleteOrphanedIPAddresses=true|",
+        )
+        return result
+
+    def get_dhcp_ranges(self, networkid):
+        """get list of ranges"""
+        logger = logging.getLogger()
+        range_list = self.get_bam_api_list(
+            "getEntities",
+            parentId=networkid,
+            type="DHCP4Range",
+        )
+        logger.debug(range_list)
+        return range_list
+
+    @staticmethod
+    def make_dhcp_ranges_list(range_list):
+        """return sorted list of dict with the start and end ipaddress class IP objects
+        and the BlueCat range object, like:
+        [
+            { "start": start_ip_obj, "end": end_ip_obj, "range": range_obj }
+            ...
+        ]"""
+        logger = logging.getLogger()
+        range_info_list = []
+        for dhcp_range in range_list:
+            start = ipaddress.ip_address(dhcp_range["properties"]["start"])
+            end = ipaddress.ip_address(dhcp_range["properties"]["end"])
+            range_info_list.append({"start": start, "end": end, "range": dhcp_range})
+        logger.info(range_info_list)
+        range_info_list.sort(key=lambda self: self["start"])
+        return range_info_list
+
+    def getparentview(self, entity_id):
+        """walk tree up to view, with cache"""
+        view_id = self.parentviewcache.get("id")
+        if view_id:
+            return view_id
+        parent = self.do("getParent", entityId=entity_id)
+        if parent == 0:
+            print("ERROR - got to top without finding a view for object id", entity_id)
+            return None
+        entity_type = parent["type"]
+        if entity_type == "View":
+            view_id = parent["id"]
+            self.parentviewcache[entity_id] = view_id
+            return view_id
+        return self.getparentview(parent)  # recursive
+
+    def get_ip_list(self, networkid, states=None):
+        """get [filtered] list of IP entities"""
+        # ip_list = conn.do(
+        ip_list = self.get_bam_api_list(
+            "getEntities",
+            parentId=networkid,
+            type="IP4Address",
+        )
+        if states:
+            ip_list = [
+                ip for ip in ip_list if ip["properties"]["state"] in states
+            ]
+        return ip_list
+
+    @staticmethod
+    def make_ip_dict(ip_list):
+        ip_dict = {
+            ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
+            for ip_obj in ip_list
+        }
+        return ip_dict
