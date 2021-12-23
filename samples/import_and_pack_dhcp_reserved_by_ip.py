@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-import_and_pack_dhcp_reserved.py network inputfile [offset]
+import_and_pack_dhcp_reserved_by_ip.py network inputfile [offset]
 inputfile format:  IP,MAC,name,fqdn
 """
 
@@ -19,7 +19,7 @@ import ipaddress
 import bluecat_bam
 
 
-__progname__ = "import_and_pack_dhcp_reserved"
+__progname__ = "import_and_pack_dhcp_reserved_by_ip"
 __version__ = "0.1"
 
 
@@ -33,16 +33,6 @@ def get_ip_list(networkid, conn):
     )
     logger.debug(ip_list)
     return ip_list
-
-
-def make_mac_dict(ip_list):
-    """make dict with mac address as the key"""
-    mac_dict = {}
-    for ip_obj in ip_list:
-        mac = ip_obj["properties"].get("macAddress")
-        if mac:
-            mac_dict[mac] = ip_obj
-    return mac_dict
 
 
 def parse_file(inputfile):
@@ -143,13 +133,15 @@ def canonical_mac(mac):
         cmac = "".join([c.lower() for c in mac if c in "0123456789abcdefABCDEF"])
     else:
         cmac = mac
-        logger.info("failed to canonicalize mac ", mac)
+        logger.info("failed to canonicalize mac %s", mac)
     return cmac
 
 
-def main():
-    """import_and_pack_dhcp_reserved.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+def get_args():
+    """set up and run config parser"""
+    config = bluecat_bam.BAM.argparsecommon(
+        "Create DHCP Reserved from imported list, matching by IP, packed without gaps"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -185,6 +177,25 @@ def main():
         + " the BAM, but do not change anything.",
     )
     args = config.parse_args()
+    return args
+
+
+def get_my_network(conn, object_ident, configuration_id):
+    """get the network cidr"""
+    logger = logging.getLogger()
+    network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+    logger.info("network_list: %s", json.dumps(network_list))
+    if len(network_list) > 1:
+        print("ERROR - cannot handle more than one network", file=sys.stderr)
+        raise ValueError
+    network_obj = network_list[0]
+    logger.info(network_obj)
+    return network_obj
+
+
+def main():
+    """import_and_pack_dhcp_reserved_by_ip.py"""
+    args = get_args()
     offset = int(args.offset)
 
     logger = logging.getLogger()
@@ -203,13 +214,7 @@ def main():
         # 'inheritPingBeforeAssign': 'true', 'gateway': '10.30.2.161',
         # 'inheritDefaultDomains': 'true', 'defaultView': '1048598',
         # 'inheritDefaultView': 'true', 'inheritDNSRestrictions': 'true'}}
-        network_list = conn.get_obj_list(conn, args.object_ident, configuration_id, "")
-        logger.info("network_list: %s", json.dumps(network_list))
-        if len(network_list) > 1:
-            print("ERROR - cannot handle more than one network", file=sys.stderr)
-            raise ValueError
-        network_obj = network_list[0]
-        # logger.info(network_obj)
+        network_obj = get_my_network(conn, args.object_ident, configuration_id)
         networkid = network_obj["id"]
         network = ipaddress.ip_network(network_obj["properties"]["CIDR"])
 
@@ -231,7 +236,6 @@ def main():
             ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
             for ip_obj in ip_list
         }
-        mac_dict = make_mac_dict(ip_list)
         # logger.info(ip_dict)
         logger.info(sorted(ip_dict.keys()))
 
@@ -243,7 +247,7 @@ def main():
         import_dict = parse_file(args.inputfile)
         # logger.info(import_dict)
 
-        # decide on start ip
+        # decide on first ip and step direction
         step = 1
         import_ip_list = sorted(import_dict.keys())
         if offset < 0:
@@ -261,46 +265,72 @@ def main():
         # logger.info(first_ip)
         # logger.info(step)
         # logger.info(last_ip)
+        walk_subnet(
+            first_ip,
+            step,
+            last_ip,
+            import_dict,
+            import_ip_list,
+            ip_dict,
+            conn,
+            args,
+            configuration_id,
+            view_id,
+        )
 
-        # walk through each IP in the subnet
-        # (can make it more efficient later)
-        current_ip = first_ip
-        index = 0  # use IP's before first_ip to fill in first then take from last
-        while current_ip != last_ip:
-            logger.info("current %s index %s", current_ip, index)
-            # FUTURE - check if IP should be skipped?  (already reserved, etc?)
 
-            line_d = import_dict.pop(current_ip, None)
-            if not line_d:
-                if index < len(import_ip_list):
-                    from_ip = import_ip_list[index]  # try beginning of list if unused
+def walk_subnet(
+    first_ip,
+    step,
+    last_ip,
+    import_dict,
+    import_ip_list,
+    ip_dict,
+    conn,
+    args,
+    configuration_id,
+    view_id,
+):
+    """walk through each IP in the subnet"""
+    # (can make it more efficient later)
+    logger = logging.getLogger()
+    current_ip = first_ip
+    index = 0  # use IP's before first_ip to fill in first then take from last
+    while current_ip != last_ip:
+        logger.info("current %s index %s", current_ip, index)
+        # FUTURE - check if IP should be skipped?  (already reserved, etc?)
+
+        line_d = import_dict.pop(current_ip, None)
+        if not line_d:
+            if index < len(import_ip_list):
+                from_ip = import_ip_list[index]  # try beginning of list if unused
+                line_d = import_dict.pop(from_ip, None)
+                if line_d:
+                    index += 1
+                else:
+                    from_ip = import_ip_list.pop()  # try end of list if unused
                     line_d = import_dict.pop(from_ip, None)
-                    if line_d:
-                        index += 1
-                    else:
-                        from_ip = import_ip_list.pop()  # try end of list if unused
-                        line_d = import_dict.pop(from_ip, None)
-                        if not line_d:
-                            break  # no more lines to import
-                print("move %s to %s" % (from_ip, current_ip))
-            else:
-                from_ip = current_ip
-                # logger.info("import %s" % (current_ip))
-                print("keep %s at %s" % (from_ip, current_ip))
-            match_to_existing(
-                current_ip,
-                line_d,
-                ip_dict,
-                conn,
-                args.checkonly,
-                configuration_id,
-                view_id,
-                args,
-            )
+                    if not line_d:
+                        break  # no more lines to import
+            print("move %s to %s" % (from_ip, current_ip))
+        else:
+            from_ip = current_ip
+            # logger.info("import %s" % (current_ip))
+            print("keep %s at %s" % (from_ip, current_ip))
+        match_to_existing(
+            current_ip,
+            line_d,
+            ip_dict,
+            conn,
+            args.checkonly,
+            configuration_id,
+            view_id,
+            args,
+        )
 
-            current_ip += step
-        if import_dict:
-            print("ERROR: left over %s" % (import_dict))  # should be empty
+        current_ip += step
+    if import_dict:
+        print("ERROR: left over %s" % (import_dict))  # should be empty
 
 
 def match_to_existing(
@@ -427,13 +457,13 @@ def do_action(
             print("error - cannot handle state:", obj_state)
 
     # fqdn
-    do_fqdn(conn, current_ip, line_d["fqdn"], line_d["ip"], view_id, line_d)
+    do_fqdn(conn, current_ip, line_d["fqdn"], view_id, line_d)
 
     final_ip_obj = conn.do("getEntityById", id=ip_obj["id"])
     print(final_ip_obj)
 
 
-def do_fqdn(conn, current_ip, line_fqdn, line_ip, view_id, line_d):
+def do_fqdn(conn, current_ip, line_fqdn, view_id, line_d):
     """check or create host record"""
     logger = logging.getLogger()
     if line_fqdn:
