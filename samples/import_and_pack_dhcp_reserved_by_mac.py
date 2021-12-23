@@ -35,16 +35,6 @@ def get_ip_list(networkid, conn):
     return ip_list
 
 
-def make_mac_dict(ip_list):
-    """make dict with mac address as the key"""
-    mac_dict = {}
-    for ip_obj in ip_list:
-        mac = ip_obj["properties"].get("macAddress")
-        if mac:
-            mac_dict[mac] = ip_obj
-    return mac_dict
-
-
 def parse_file(inputfile):
     """read the input file"""
     # ip,mac,name,fqdn,other...
@@ -147,13 +137,15 @@ def canonical_mac(mac):
         cmac = "".join([c.lower() for c in mac if c in "0123456789abcdefABCDEF"])
     else:
         cmac = mac
-        logger.info("failed to canonicalize mac ", mac)
+        logger.info("failed to canonicalize mac %s", mac)
     return cmac
 
 
-def main():
-    """import_and_pack_dhcp_reserved.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+def get_args():
+    """set up and run config parser"""
+    config = bluecat_bam.BAM.argparsecommon(
+        "Create DHCP Reserved from imported list, matching by MAC Address, packed without gaps"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -189,6 +181,25 @@ def main():
         + " the BAM, but do not change anything.",
     )
     args = config.parse_args()
+    return args
+
+
+def get_my_network(conn, object_ident, configuration_id):
+    """get network obj"""
+    logger = logging.getLogger()
+    network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+    logger.info("network_list: %s", json.dumps(network_list))
+    if len(network_list) > 1:
+        print("ERROR - cannot handle more than one network", file=sys.stderr)
+        raise ValueError
+    network_obj = network_list[0]
+    logger.info(network_obj)
+    return network_obj
+
+
+def main():
+    """import_and_pack_dhcp_reserved.py"""
+    args = get_args()
     offset = int(args.offset)
 
     logger = logging.getLogger()
@@ -207,21 +218,15 @@ def main():
         # 'inheritPingBeforeAssign': 'true', 'gateway': '10.30.2.161',
         # 'inheritDefaultDomains': 'true', 'defaultView': '1048598',
         # 'inheritDefaultView': 'true', 'inheritDNSRestrictions': 'true'}}
-        network_list = conn.get_obj_list(conn, args.object_ident, configuration_id, "")
-        logger.info("network_list: %s", json.dumps(network_list))
-        if len(network_list) > 1:
-            print("ERROR - cannot handle more than one network", file=sys.stderr)
-            raise ValueError
-        network_obj = network_list[0]
-        # logger.info(network_obj)
+        network_obj = get_my_network(conn, args.object_ident, configuration_id)
         networkid = network_obj["id"]
         network = ipaddress.ip_network(network_obj["properties"]["CIDR"])
 
         # get DHCP range(s)
         # {"id": 8869275, "name": null, "type": "DHCP4Range", "properties":
         # {"start": "10.213.135.5", "end": "10.213.135.254"}}
-        range_list = get_dhcp_ranges(network_obj["id"], conn)
-        range_info_list = get_dhcp_ranges_info(range_list)
+        range_list = conn.get_dhcp_ranges(network_obj["id"])
+        range_info_list = conn.make_dhcp_ranges_list(range_list)
 
         # get IP info from BAM
         # {"id": 17396816, "name": "MYPC-1450", "type": "IP4Address",
@@ -235,7 +240,6 @@ def main():
             ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
             for ip_obj in ip_list
         }
-        mac_dict = make_mac_dict(ip_list)
         # logger.info(ip_dict)
         logger.info(sorted(ip_dict.keys()))
 
@@ -249,13 +253,11 @@ def main():
 
         # decide on first and last IP, and step direction
         step = 1
-        import_ip_list = sorted(ip_import_dict.keys())
         if offset < 0:
             # offset from end on network
             step = -1
             first_ip = network.broadcast_address + offset
             last_ip = network.network_address + 2  # or more?
-            import_ip_list.reverse()
         elif offset == 0:
             first_ip = range_info_list[0]["start"]
             last_ip = network.broadcast_address - 1
@@ -265,21 +267,50 @@ def main():
         # logger.info(first_ip)
         # logger.info(step)
         # logger.info(last_ip)
+        walk_subnet(
+            first_ip,
+            step,
+            last_ip,
+            ip_dict,
+            mac_import_dict,
+            conn,
+            args,
+            configuration_id,
+            view_id,
+        )
 
-        # walk through each IP
-        # (can make it more efficient later)
-        current_ip = first_ip
-        needed = len(mac_import_dict)
-        later_ip_list = []
-        while current_ip != last_ip and needed > 0:
-            logger.info("current %s", current_ip)
-            skip = False
-            ip_obj = ip_dict.get(current_ip)
-            if ip_obj:
+
+def walk_subnet(
+    first_ip,
+    step,
+    last_ip,
+    ip_dict,
+    mac_import_dict,
+    conn,
+    args,
+    configuration_id,
+    view_id,
+):
+    """walk through each IP, first pass, replace active IP's with matching MAC Address"""
+    # IP address in import data is ignored
+    logger = logging.getLogger()
+    current_ip = first_ip
+    needed = len(mac_import_dict)
+    later_ip_list = []
+    while current_ip != last_ip and needed > 0:
+        logger.info("current %s", current_ip)
+        ip_obj = ip_dict.get(current_ip)
+        if ip_obj:
+            # Need to check state first *****
+            # can have multiple IP's with the same mac address,
+            # but only the active one 'counts'
+            state = ip_obj["properties"]["state"]
+            if state in ("DHCP_RESERVED", "DHCP_ALLOCATED", "RESERVED"):
                 mac = ip_obj["properties"].get("macAddress")
                 if mac:
                     line_d = mac_import_dict.pop(canonical_mac(mac), None)
                     if line_d:
+                        # found matching MAC address in import data
                         print("keep %s at %s" % (current_ip, current_ip))
                         match_to_existing(
                             current_ip,
@@ -293,59 +324,61 @@ def main():
                         )
                         needed -= 1
                     else:  # no matching mac in import data
-                        if ip_obj["properties"]["state"] not in (
-                            "DHCP_RESERVED",
-                            "DHCP_ALLOCATED",
-                            "RESERVED",
-                        ):
-                            needed -= 1
-                            print("use later", current_ip)
-                            later_ip_list.append(current_ip)
+                        if state == "DHCP_ALLOCATED":
+                            print(
+                                "active but not in import, convert to DHCP Reserved",
+                                current_ip,
+                            )
+                            new_ip_obj = update_dhcp_allocated(conn, ip_obj, mac, None)
+                            print(new_ip_obj)
+                            # leave any name or hostname unchanged
                         else:
-                            print("skip", current_ip)
-                            skip = True
+                            print("skip", current_ip, ip_obj)
+
                 else:
-                    if ip_obj["properties"]["state"] not in (
-                        "DHCP_RESERVED",
-                        "DHCP_ALLOCATED",
-                        "RESERVED",
-                    ):
-                        needed -= 1
-                        print("use later", current_ip)
-                        later_ip_list.append(current_ip)
-                    else:
-                        print("skip", current_ip)
-                        skip = True
+                    # no mac address, must be RESERVED, skip it
+                    print("skip", current_ip, ip_obj)
             else:
+                # state is STATIC or DHCP_FREE, both are 'free' to use
                 needed -= 1
                 print("use later", current_ip)
                 later_ip_list.append(current_ip)
-            current_ip += step
-        logger.warning(
-            "remaining in mac_import_dict: %s", sorted(mac_import_dict.keys())
-        )
+        else:
+            # no IP obj, free to use
+            needed -= 1
+            print("use later", current_ip)
+            later_ip_list.append(current_ip)
+        current_ip += step
+    logger.warning("remaining in mac_import_dict: %s", sorted(mac_import_dict.keys()))
 
-        # now walk through the later list and fill in
-        index = 0
-        for mac in mac_import_dict.keys():
-            line_d = mac_import_dict[mac]
-            print("mac, line_d", mac, line_d)
-            current_ip = later_ip_list[index]
-            from_ip = line_d["ip"]
-            print("move %s to %s" % (from_ip, current_ip))
-            ip_obj = ip_dict.get(current_ip)
-            print("index, current_ip, ip_obj", current_ip, ip_obj)
-            match_to_existing(
-                current_ip,
-                line_d,
-                ip_obj,
-                conn,
-                args.checkonly,
-                configuration_id,
-                view_id,
-                args,
-            )
-            index += 1
+    # now walk through the later list and fill in,
+    # delete the old IP when moving device
+    index = 0
+    for mac, line_d in mac_import_dict.items():
+        print("mac, line_d", mac, line_d)
+        current_ip = later_ip_list[index]
+        from_ip = ipaddress.ip_address(line_d["ip"])
+        print("move %s to %s" % (from_ip, current_ip))
+        ip_obj = ip_dict.get(current_ip)
+        print("index, current_ip, ip_obj", current_ip, ip_obj)
+        # delete old
+        old_obj = ip_dict.get(from_ip)
+        if old_obj:
+            print("delete", old_obj)
+            result = conn.delete_ip_obj(old_obj)
+            if result:
+                print("deleting old IP result:", result)
+        match_to_existing(
+            current_ip,
+            line_d,
+            ip_obj,
+            conn,
+            args.checkonly,
+            configuration_id,
+            view_id,
+            args,
+        )
+        index += 1
 
 
 def match_to_existing(
@@ -450,7 +483,7 @@ def do_action(
             print("ERROR - no mac in import or BlueCat")
             return
         if obj_state in ("DHCP_ALLOCATED", "STATIC"):
-            update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
+            new_ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
 
         elif obj_state == "DHCP_FREE":
             replace_dhcp_free(
@@ -471,13 +504,13 @@ def do_action(
             print("error - cannot handle state:", obj_state)
 
     # fqdn
-    do_fqdn(conn, current_ip, line_d["fqdn"], str(current_ip), view_id, line_d)
+    do_fqdn(conn, current_ip, line_d["fqdn"], view_id, line_d)
 
     final_ip_obj = conn.do("getEntityById", id=ip_obj["id"])
     print(final_ip_obj)
 
 
-def do_fqdn(conn, current_ip, line_fqdn, line_ip, view_id, line_d):
+def do_fqdn(conn, current_ip, line_fqdn, view_id, line_d):
     """check or create host record"""
     logger = logging.getLogger()
     if line_fqdn:
@@ -544,36 +577,6 @@ def parse_line(line, line_pat):
     return line_d
 
 
-def get_dhcp_ranges_info(range_list):
-    """return sorted list of dict with the start and end IP ipaddress objects
-    and the range object, like:
-    [
-        { "start": start_ip_obj, "end": end_ip_obj, "range": range_obj }
-        ...
-    ]"""
-    logger = logging.getLogger()
-    range_info_list = []
-    for dhcp_range in range_list:
-        start = ipaddress.ip_address(dhcp_range["properties"]["start"])
-        end = ipaddress.ip_address(dhcp_range["properties"]["end"])
-        range_info_list.append({"start": start, "end": end, "range": dhcp_range})
-    logger.info(range_info_list)
-    range_info_list.sort(key=lambda self: self["start"])
-    return range_info_list
-
-
-def get_dhcp_ranges(networkid, conn):
-    """get list of ranges"""
-    logger = logging.getLogger()
-    range_list = conn.get_bam_api_list(
-        "getEntities",
-        parentId=networkid,
-        type="DHCP4Range",
-    )
-    logger.debug(range_list)
-    return range_list
-
-
 def get_either_mac(line_mac, conn, configuration_id, ip_obj, args):
     """get mac from input line or from existing IP object"""
     logger = logging.getLogger()
@@ -611,13 +614,13 @@ def get_mac(conn, configuration_id, mac):
     return mac_obj
 
 
-def update_dhcp_allocated(conn, ip_obj, line_mac, line_name):
+def update_dhcp_allocated(conn, ip_obj, mac, name):
     """update dhcp allocated"""
     logger = logging.getLogger()
     result = conn.do(
         "changeStateIP4Address",
         addressId=ip_obj["id"],
-        macAddress=line_mac,
+        macAddress=mac,
         targetState="MAKE_DHCP_RESERVED",
     )
     if result:
@@ -630,8 +633,9 @@ def update_dhcp_allocated(conn, ip_obj, line_mac, line_name):
     ip_obj = new_ip_obj
 
     # update the name (cannot be done in the above API)
-    if line_name:
-        set_name(conn, ip_obj, line_name)
+    if name:
+        new_ip_obj = set_name(conn, ip_obj, name)
+    return new_ip_obj
 
 
 def replace_dhcp_free(
