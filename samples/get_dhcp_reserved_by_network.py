@@ -60,7 +60,9 @@ def get_dhcp_reserved(networkid, conn, logger):
 
 def main():
     """get_dhcp_reserved_by_network.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Get list of all DHCP_RESERVED in a Network"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "

@@ -55,7 +55,7 @@ def get_dhcp_reserved(networkid, conn):
     reserved_list = [
         ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
     ]
-    print("dhcp", len(ip_list), "reserved", len(reserved_list), file=sys.stderr)
+    print("dhcp", len(ip_list), "reserved", len(reserved_list))
     return reserved_list
 
 
@@ -113,13 +113,7 @@ def main():
             reserved_list = get_dhcp_reserved(entityId, conn)
             for ip in reserved_list:
                 print_ip(ip)
-                # result = conn.do("delete", objectId=ip["id"])
-                result = conn.do(
-                    "deleteWithOptions",
-                    method="delete",
-                    objectId=ip["id"],
-                    options="noServerUpdate=true|deleteOrphanedIPAddresses=true|",
-                )
+                result = conn.do("delete", objectId=ip["id"])
                 if result:
                     print("result: ", result)
 
