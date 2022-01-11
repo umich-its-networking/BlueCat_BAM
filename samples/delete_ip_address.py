@@ -47,7 +47,8 @@ def main():
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        ##input_list = conn.get_obj_list(conn, args.object_ident, configuration_id, "")
+        # future accept list?
+        # input_list = conn.get_obj_list(args.object_ident, configuration_id, "")
 
         ip_obj = conn.do(
             "getIP4Address", method="get", containerId=configuration_id, address=ip

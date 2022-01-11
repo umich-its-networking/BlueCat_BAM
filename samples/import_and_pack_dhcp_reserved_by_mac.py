@@ -187,7 +187,7 @@ def get_args():
 def get_my_network(conn, object_ident, configuration_id):
     """get network obj"""
     logger = logging.getLogger()
-    network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+    network_list = conn.get_obj_list(object_ident, configuration_id, "")
     logger.info("network_list: %s", json.dumps(network_list))
     if len(network_list) > 1:
         print("ERROR - cannot handle more than one network", file=sys.stderr)
@@ -249,7 +249,7 @@ def main():
         # delimiter can be comma, tab, or space
         # "other..." fields are ignored
         ip_import_dict, mac_import_dict = parse_file(args.inputfile)
-        # logger.info(ip_import_dict)
+        logger.debug(ip_import_dict)
 
         # decide on first and last IP, and step direction
         step = 1
@@ -334,7 +334,6 @@ def walk_subnet(
                             # leave any name or hostname unchanged
                         else:
                             print("skip", current_ip, ip_obj)
-
                 else:
                     # no mac address, must be RESERVED, skip it
                     print("skip", current_ip, ip_obj)
@@ -351,6 +350,15 @@ def walk_subnet(
         current_ip += step
     logger.warning("remaining in mac_import_dict: %s", sorted(mac_import_dict.keys()))
 
+    second_walk(
+        conn, mac_import_dict, later_ip_list, ip_dict, args, configuration_id, view_id
+    )
+
+
+def second_walk(
+    conn, mac_import_dict, later_ip_list, ip_dict, args, configuration_id, view_id
+):
+    """walk ip's a second time, filling in"""
     # now walk through the later list and fill in,
     # delete the old IP when moving device
     index = 0
@@ -483,7 +491,7 @@ def do_action(
             print("ERROR - no mac in import or BlueCat")
             return
         if obj_state in ("DHCP_ALLOCATED", "STATIC"):
-            new_ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
+            ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
 
         elif obj_state == "DHCP_FREE":
             replace_dhcp_free(

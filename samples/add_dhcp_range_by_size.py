@@ -98,7 +98,7 @@ def main():
         configuration_id = configuration_obj["id"]
 
         obj_list = conn.get_obj_list(
-            conn, args.object_ident, configuration_id, rangetype
+            args.object_ident, configuration_id, rangetype
         )
         logger.info("obj_list: %s", obj_list)
 

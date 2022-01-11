@@ -68,7 +68,7 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        entity_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         for obj in entity_list:
             obj_id = obj.get("id")
             delete_deployment_option(conn, args, obj_id)

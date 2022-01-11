@@ -183,7 +183,7 @@ def get_args():
 def get_my_network(conn, object_ident, configuration_id):
     """get the network cidr"""
     logger = logging.getLogger()
-    network_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
+    network_list = conn.get_obj_list(object_ident, configuration_id, "")
     logger.info("network_list: %s", json.dumps(network_list))
     if len(network_list) > 1:
         print("ERROR - cannot handle more than one network", file=sys.stderr)

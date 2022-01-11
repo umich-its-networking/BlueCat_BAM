@@ -152,7 +152,7 @@ def main():
             args.configuration, args.view
         )
 
-        network_list = conn.get_obj_list(conn, args.object_ident, configuration_id, "")
+        network_list = conn.get_obj_list(args.object_ident, configuration_id, "")
         logger.info("network_list: %s", json.dumps(network_list))
         if len(network_list) > 1:
             print("ERROR - cannot handle more than one network", file=sys.stderr)

@@ -128,7 +128,7 @@ def main():
             dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
 
         object_ident = args.object_ident
-        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        entity_list = conn.get_obj_list(object_ident, configuration_id, args.type)
         logger.info(entity_list)
 
         for entity in entity_list:
