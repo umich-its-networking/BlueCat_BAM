@@ -551,7 +551,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                         address=object_ident,
                     )
                 else:
-                    obj = self.get_range(self, object_ident, containerId, rangetype)
+                    obj = self.get_range(object_ident, containerId, rangetype)
                     if obj and obj['id']:
                         obj_type = obj['type']
                     else:
@@ -563,12 +563,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             print("Warning - no object found for:", object_ident, file=sys.stderr)
         return obj, obj_type
 
-    @staticmethod
-    def get_range(conn, address, containerId, rangetype):
+    def get_range(self, address, containerId, rangetype):
         """get range - block, network, or dhcp range - by IPv4 or IPv6"""
         logger = logging.getLogger()
         logger.info("get_range for address: %s, containerId %s, rangetype %s", address, containerId, rangetype)
-        obj = conn.do(
+        obj = self.do(
             "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
         )
         obj_id = obj["id"]
@@ -589,7 +588,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 # it should return the Network, but it returns the Block.
                 # So check for a matching Network.
                 if rangetype == "" and obj["type"] == "IP4Block":
-                    network_obj = conn.do(
+                    network_obj = self.do(
                         "getEntityByCIDR",
                         method="get",
                         cidr=cidr,
