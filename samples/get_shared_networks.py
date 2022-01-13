@@ -10,6 +10,7 @@ from __future__ import print_function
 import os
 import sys
 import json
+import re
 import argparse
 import logging
 
@@ -39,13 +40,27 @@ def main():
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(configuration_name)
+        if ident == "-":
+            for line in sys.stdin:
+                # remove one line ending
+                line = re.sub(r'(?:\r\n|\n)$', '', line, count=1)
+                get_shared_net(conn, line, configuration_id, group )
+        else:
+            get_shared_net(conn, ident, configuration_id, group )
 
+
+def get_shared_net(conn, ident, configuration_id, group ):
+        logger = logging.getLogger()
         obj, obj_type = conn.get_obj(ident, configuration_id, "IP4Network", warn=False)
         logger.info("obj %s, type %s",obj, obj_type)
+        shared_name = None
         if obj_type:
             if obj:
                 obj_id = obj['id']
                 shared_name = obj['properties'].get('sharedNetwork')
+            else:
+                print("ERROR - not found:",ident)
+                return
         else:
             shared_name = ident
 
