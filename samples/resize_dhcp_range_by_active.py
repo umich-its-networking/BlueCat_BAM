@@ -56,19 +56,20 @@ def main():
         + "unless 'type' is set to override the pattern matching",
     )
     config.add_argument(
-        "free",
-        help="offset of starting IP of DHCP range, "
+        "offset",
+        help="default offset of starting IP of DHCP range, "
+        + "if no dhcp ranges and no active IP's are found, "
         + "at least 2 to allow for network and gateway IP's, "
         + "at least 4 if using HSRP",
     )
+    config.add_argument("free", help="minimum number of free IP's in dhcp range")
     config.add_argument(
         "--checkonly",
         action="store_true",
-        help="verify that the IP and mac addresses in the import file match"
-        + " the BAM, but do not change anything.",
+        help="check what the new range would be," + " but do not change anything.",
     )
     config.add_argument(
-        "--onlyactive",
+        "--activeonly",
         action="store_true",
         help="start at first active, instead of first DHCP range",
     )
@@ -82,12 +83,13 @@ def main():
     rangetype = "IP4Network"
     free = int(args.free)
     checkonly = args.checkonly
-    onlyactive = args.onlyactive
+    activeonly = args.activeonly
+    offset = int(args.offset)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         logger.info("obj_list: %s", obj_list)
 
         for network_obj in obj_list:
@@ -97,107 +99,131 @@ def main():
                 % (network_obj["name"], cidr, ipaddress.IPv4Network(cidr).num_addresses)
             )
             # print(network_obj)
-            do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive)
+            do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly)
 
 
-def do_dhcp_ranges(network_obj, conn, free, checkonly, onlyactive):
-    """resize dhcp ranges"""
+def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
+    """do dhcp ranges"""
     logger = logging.getLogger()
     networkid = network_obj["id"]
     cidr = network_obj["properties"]["CIDR"]
     netsize = ipaddress.IPv4Network(cidr).num_addresses
     network_ip = ipaddress.IPv4Network(cidr).network_address
     broadcast_ip = ipaddress.IPv4Network(cidr).broadcast_address
-    logger.info(
+    logger.debug(
         "netsize: %s, network_ip: %s, broadcast_ip: %s",
         netsize,
         network_ip,
         broadcast_ip,
     )
 
-    # get dhcp range
+    # set defaults
     lowest_dhcp = broadcast_ip
-    ranges_list = get_dhcp_ranges(networkid, conn)
-    if len(ranges_list) > 1:
-        print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
-        return
-    if len(ranges_list) == 1:
-        range_obj = ranges_list[0]
-        start = ipaddress.ip_address(range_obj["properties"]["start"])
-        end = ipaddress.ip_address(range_obj["properties"]["end"])
-        rangesize = int(end) - int(start) + 1
-        print("    previous DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
-        if start < lowest_dhcp:
-            lowest_dhcp = start
-    else:
-        range_obj = None
-    logger.info("lowest_dhcp: %s", lowest_dhcp)
-
-    # find limits of active IP's (DHCP_ALLOCATED) (static?)
-    ip_list = get_ip_list(networkid, conn)
-    lowest_active = broadcast_ip
     highest_active = network_ip
-    active = 0
-    for ip_obj in ip_list:
-        logger.warning(
-            "ip %s, state %s",
-            ip_obj["properties"]["address"],
-            ip_obj["properties"]["state"],
+
+    # get dhcp range
+    if not activeonly:
+        ranges_list = get_dhcp_ranges(networkid, conn)
+        if len(ranges_list) > 1:
+            print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
+            return
+        if len(ranges_list) == 1:
+            range_obj = ranges_list[0]
+            start = ipaddress.ip_address(range_obj["properties"]["start"])
+            end = ipaddress.ip_address(range_obj["properties"]["end"])
+            rangesize = int(end) - int(start) + 1
+            print("    previous DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
+            if start < lowest_dhcp:
+                lowest_dhcp = start
+    logger.debug("lowest_dhcp: %s", lowest_dhcp)
+
+    # find limits of active IP's (DHCP_ALLOCATED) (static?) (dhcp reserved?)
+    # but get all IP's, for later use?
+    ip_list = conn.get_ip_list(networkid, states=["DHCP_ALLOCATED", "DHCP_RESERVED"])
+    ip_dict = {}
+    if ip_list:
+        ip_dict = conn.make_ip_dict(ip_list)
+        ip_sort = sorted(ip_dict)
+        lowest_active = ip_sort[0]
+        highest_active = ip_sort[-1]
+        active = len(ip_list)  # no, assumes all in ranges
+        logger.debug(
+            "lowest_active: %s, highest_active: %s", lowest_active, highest_active
         )
-        # need to make dhcp reserved inclusion optional ****
-        if ip_obj["properties"]["state"] in ("DHCP_ALLOCATED", "DHCP_RESERVED"):
-            active += 1
-            ip_address = ipaddress.ip_address(ip_obj["properties"]["address"])
-            if ip_address < lowest_active:
-                lowest_active = ip_address
-            if ip_address > highest_active:
-                highest_active = ip_address
-    logger.warning(
-        "lowest_active: %s, highest_active: %s", lowest_active, highest_active
-    )
-    logger.warning("active %s", active)
+        if lowest_active < lowest_dhcp:
+            lowest_dhcp = lowest_active
 
     # choose outer limits
-    if onlyactive and active > 0:
-        start = lowest_active
-    elif range and start > lowest_active:
-        start = lowest_active
-    end = min(highest_active, start - 1)
+    if lowest_dhcp == broadcast_ip:
+        # no dhcp range, no active ip
+        print("no dhcp ranges and no active ip")
+        lowest_dhcp = network_ip + offset
+    start = lowest_dhcp
+    end = max(highest_active, start - 1)
     range_size = int(end) - int(start) + 1
+    logger.debug("initial range %s to %s", start, end)
 
-    # add free
-    desired_size = active + free
-    print("desired", desired_size, "free", free)
-    if desired_size > range_size:
-        # try to increase the range at the end
-        diff = desired_size - (active + free)
-        if end + diff >= broadcast_ip:
-            end = broadcast_ip - 1
+    # count active in range
+    active = 0
+    current_free = 0
+    ip = start
+    while ip <= end:
+        if ip_dict.get(ip):
+            active += 1
         else:
-            end += diff
-        range_size = int(end) - int(start) + 1
+            current_free += 1
+        ip += 1
+    logger.debug("active %s, free %s", active, current_free)
+    diff = free - current_free
+    logger.debug(
+        "desired free %s, current free %s, diff %s", free, current_free, diff
+    )
 
-        if desired_size > range_size:
-            # try to increase the range at the start
-            ip_dict = {
-                ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
-                for ip_obj in ip_list
-            }
-            diff = desired_size - range_size
-            ip = start - 1
-            while diff > 0:
-                ip_obj = ip_dict.get(ip)
-                if ip_obj and ip_obj["properties"]["state"] in (
-                    "STATIC",
-                    "RESERVED",
-                    "GATEWAY",
-                ):
-                    print("free IP limited to", range_size - active)
-                    break
-                start = ip
-                range_size = int(end) - int(start) + 1
-                diff = desired_size - range_size
-                ip -= 1
+    # increase range if more free are desired
+    # try to increase the range at the end
+    ip = end
+    while diff > 0:
+        ip += 1  # next IP to check
+        ip_obj = ip_dict.get(ip)
+        logger.debug("moving end, checking %s", str(ip))
+        if ip >= broadcast_ip:
+            ip -= 1
+            logger.debug("hit end of network, use %s", str(ip))
+            break
+        if ip_obj:
+            logger.debug("active %s", str(ip_obj))
+            active += 1
+        else:
+            logger.debug("not active %s", str(ip))
+            diff -= 1
+    end = ip
+    range_size = int(end) - int(start) + 1
+    logger.debug(
+        "range now %s to %s, size %s, diff %s", str(start), str(end), range_size, diff
+    )
+
+    # try to increase the range at the start
+    ip = start
+    while diff > 0:
+        ip -= 1  # next IP to check
+        ip_obj = ip_dict.get(ip)
+        logger.debug("moving start back, checking %s", str(ip))
+        if ip <= network_ip + 3:
+            ip += 1
+            logger.debug("hit start of network, use %s", str(ip))
+            break
+        if ip_obj:
+            logger.debug("active %s", str(ip_obj))
+            active += 1
+        else:
+            logger.debug("not active %s", str(ip))
+            diff -= 1
+
+    start = ip
+    range_size = int(end) - int(start) + 1
+    logger.debug(
+        "new range %s to %s, size %s, diff %s", str(start), str(end), range_size, diff
+    )
 
     # decide new range
     if end < start:
