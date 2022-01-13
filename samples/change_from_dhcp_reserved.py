@@ -2,14 +2,12 @@
 
 """
 change_from_dhcp_reserved.py < list-of-networkIP
-[--cfg configuration] [--view viewname]
 """
 
 
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import logging
 
 import bluecat_bam
@@ -106,7 +104,7 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         logger.info("obj_list: %s", obj_list)
 
         for entity in obj_list:
@@ -125,12 +123,19 @@ def main():
                     start=0,
                     count=1000,
                 )
+                # get view of each record
+                hostrec_view_dict={}
+                for host_obj in hostrec_list:
+                    host_id = host_obj['id']
+                    logger.info("host_id %s",host_id)
+                    hostrec_view_dict[host_id] = conn.getparentview(host_id)
+
                 result = conn.do("delete", objectId=ip["id"])
                 if result:
                     print("result: ", result)
                 hostname_list = []
                 for host_obj in hostrec_list:
-                    view_id = conn.getparentview(host_obj["id"])
+                    view_id = hostrec_view_dict[host_id]
                     result = conn.do(
                         "addHostRecord",
                         absoluteName=host_obj["properties"]["absoluteName"],

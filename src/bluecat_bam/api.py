@@ -58,8 +58,8 @@ import json
 import argparse
 import os
 import re
-import requests
 import ipaddress
+import requests
 
 
 # double underscore names
@@ -470,60 +470,70 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             listall.extend(listone)
         return listall
 
-    def get_id_list(self, conn, object_ident, containerId, rangetype):
+    def get_id_list(self, object_ident, containerId, rangetype):
         """get object id, or a list of objects from a file"""
-        obj_list = self.get_obj_list(conn, object_ident, containerId, rangetype)
+        obj_list = self.get_obj_list(object_ident, containerId, rangetype)
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
-    def get_obj_list(self, conn, object_ident, containerId, rangetype):
+    def get_obj_list(self, object_ident, containerId, rangetype):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
+        obj_list = []
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                obj_list = [
-                    self.get_obj(conn, line.strip(), containerId, rangetype)
-                    for line in f
-                    if line.strip() != ""
-                ]
+                for line in f:
+                    if line.strip() != "":
+                        obj, obj_type = self.get_obj(line.strip(), containerId, rangetype)
+                        if obj and obj['id']:
+                            obj_list.append(obj)
+                        else:
+                            print("not found", line)
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
-        obj = self.get_obj(conn, object_ident, containerId, rangetype, warn=False)
+        obj, obj_type = self.get_obj(object_ident, containerId, rangetype, warn=False)
         if obj and obj.get("id"):
             obj_list = [obj]
+        elif obj_type:
+            print("not found", object_ident)
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    obj_list = [
-                        self.get_obj(conn, line.strip(), containerId, rangetype)
-                        for line in f
-                        if line.strip() != ""
-                    ]
+                    for line in f:
+                        if line.strip() != "":
+                            obj, obj_type = self.get_obj(line.strip(), containerId, rangetype)
+                            if obj and obj['id']:
+                                obj_list.append(obj)
+                            else:
+                                print("not found", line)
                 # remove failed entries
                 logger.info(obj_list)
-                new_obj_list = [obj for obj in obj_list if obj]
-                logger.info(new_obj_list)
-                return new_obj_list
+                return obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
-                obj_list = []
         return obj_list
 
-    def get_obj(self, conn, object_ident, containerId, rangetype, warn=True):
-        """get an object, given an id, IP, CIDR, or range"""
+    def get_obj(self, object_ident, containerId, rangetype, warn=True):
+        """get an object, given an id, IP, CIDR, or range,
+        return object and type matched"""
         logger = logging.getLogger()
+        obj_type = None
         id_pattern = re.compile(r"\d+$")
         id_match = id_pattern.match(object_ident)
         logger.info("id Match result: %s", id_match)
         if id_match:  # an id
-            obj = conn.do("getEntityById", id=object_ident)
+            obj = self.do("getEntityById", id=object_ident)
+            obj_type = "id"
         else:  # not an id
             ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
             ip_match = ip_pattern.match(object_ident)
             logger.info("IP Match result: '%s'", ip_match)
             if ip_match:  # an IP
+                obj_type = "IP4Address"
+                if "/" in object_ident:
+                    obj_type = "IP4Network"
                 logger.info(
                     "IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2)
                 )
@@ -531,28 +541,33 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 if not rangetype:
                     if ip_match.group(2) == "-":
                         rangetype = "DHCP4Range"
+                        obj_type = "DHCP4Range"
                     # "/" matches either IP4Block or IP4Network
                 if rangetype == "IP4Address":
-                    obj = conn.do(
+                    obj = self.do(
                         "getIP4Address",
                         method="get",
                         containerId=containerId,
                         address=object_ident,
                     )
                 else:
-                    obj = self.get_range(conn, object_ident, containerId, rangetype)
-            else:  # not and IP or id
+                    obj = self.get_range(self, object_ident, containerId, rangetype)
+                    if obj and obj['id']:
+                        obj_type = obj['type']
+                    else:
+                        obj = None
+            else:  # not an IP or id
                 obj = None
-        logger.info("get_obj returns %s of type %s", obj, rangetype)
+        logger.info("get_obj returns %s of type %s", obj, obj_type)
         if not obj and warn:
             print("Warning - no object found for:", object_ident, file=sys.stderr)
-        return obj
+        return obj, obj_type
 
     @staticmethod
     def get_range(conn, address, containerId, rangetype):
         """get range - block, network, or dhcp range - by IPv4 or IPv6"""
         logger = logging.getLogger()
-        logger.info("get_range: %s", address)
+        logger.info("get_range for address: %s, containerId %s, rangetype %s", address, containerId, rangetype)
         obj = conn.do(
             "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
         )
@@ -787,7 +802,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             view_id = parent["id"]
             self.parentviewcache[entity_id] = view_id
             return view_id
-        return self.getparentview(parent)  # recursive
+        return self.getparentview(parent["id"])  # recursive
 
     def get_ip_list(self, networkid, states=None):
         """get [filtered] list of IP entities"""
@@ -798,13 +813,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             type="IP4Address",
         )
         if states:
-            ip_list = [
-                ip for ip in ip_list if ip["properties"]["state"] in states
-            ]
+            ip_list = [ip for ip in ip_list if ip["properties"]["state"] in states]
         return ip_list
 
     @staticmethod
     def make_ip_dict(ip_list):
+        """convert ip_list to dict: {ipaddress_class_obj: ip_entity}"""
         ip_dict = {
             ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
             for ip_obj in ip_list
