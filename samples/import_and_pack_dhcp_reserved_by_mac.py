@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-import_and_pack_dhcp_reserved.py network inputfile [offset]
+import_and_pack_dhcp_reserved_by_mac.py network inputfile [offset]
 inputfile format:  IP,MAC,name,fqdn
+see help in argparse section
 """
 
 
@@ -19,7 +20,7 @@ import ipaddress
 import bluecat_bam
 
 
-__progname__ = "import_and_pack_dhcp_reserved"
+__progname__ = "import_and_pack_dhcp_reserved_by_mac"
 __version__ = "0.1"
 
 
