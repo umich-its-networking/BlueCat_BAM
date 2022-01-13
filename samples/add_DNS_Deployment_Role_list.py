@@ -45,8 +45,8 @@ def readserverlist(serverlistfile, conn, configuration_id):
                 print("ERROR - role not valid:", role)
                 sys.exit(1)
 
-            interface = bluecat_bam.BAM.getinterface(
-                server_name, configuration_id, conn
+            interface = conn.getinterface(
+                server_name, configuration_id
             )
             if interface:
                 interfaceid = interface["id"]

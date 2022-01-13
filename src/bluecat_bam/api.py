@@ -600,11 +600,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                         logger.info("IP4Network found: %s", obj)
         return obj
 
-    @staticmethod
-    def getinterface(server_name, configuration_id, conn):
+    def getinterface(self, server_name, configuration_id):
         """get server interface object, given the server name or interface name"""
         logger = logging.getLogger()
-        interface_obj_list = conn.do(
+        interface_obj_list = self.do(
             "searchByObjectTypes",
             keyword=server_name,
             types="NetworkServerInterface",
@@ -621,8 +620,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 logger.info("%s did not match %s", server_name, interface["name"])
                 continue
             # check which Configuration
-            server_obj = conn.do("getParent", entityId=interface["id"])
-            server_configuration = conn.do("getParent", entityId=server_obj["id"])
+            server_obj = self.do("getParent", entityId=interface["id"])
+            server_configuration = self.do("getParent", entityId=server_obj["id"])
             if server_configuration["id"] == configuration_id:
                 interface_ok_list.append(interface)
         if len(interface_ok_list) > 1:
@@ -639,7 +638,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 return interface_ok_list[0]
 
         # try another method, in case they gave the server display name instead
-        server_obj_list = conn.do(
+        server_obj_list = self.do(
             "getEntitiesByNameUsingOptions",
             parentId=configuration_id,
             name=server_name,
@@ -664,7 +663,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             print("ERROR - server not found for name", server_name)
             sys.exit(1)
 
-        interface_obj_list = conn.do(
+        interface_obj_list = self.do(
             "getEntities",
             method="get",
             parentId=server_id,
