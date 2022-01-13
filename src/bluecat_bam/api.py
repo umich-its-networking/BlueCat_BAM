@@ -804,7 +804,6 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
 
     def get_ip_list(self, networkid, states=None):
         """get [filtered] list of IP entities"""
-        # ip_list = conn.do(
         ip_list = self.get_bam_api_list(
             "getEntities",
             parentId=networkid,
