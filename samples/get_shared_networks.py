@@ -13,6 +13,8 @@ import logging
 
 import bluecat_bam
 
+format_items = ['input', 'ip','name','share']
+
 
 def main():
     """get_shared_networks.py"""
@@ -25,6 +27,9 @@ def main():
     config.add_argument(
         "--group", "-g", help="shared network group name", default="Shared Networks"
     )
+    config.add_argument(
+        "--list", nargs="+", default=[], help="space separated output column list: name ip share"
+    )
 
     args = config.parse_args()
 
@@ -35,19 +40,38 @@ def main():
     configuration_name = args.configuration
     ident = args.ident
     group = args.group
+    format_list = args.list
+
+    for name in format_list:
+        if name not in format_items:
+            print("format item not valid:", name)
+            print("valid items:", format_items)
+            return
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(configuration_name)
+        net_list=[] # for dedup
+        data_list=[]
         if ident == "-":
             for line in sys.stdin:
                 # remove one line ending
                 line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
-                get_shared_net(conn, line, configuration_id, configuration_name, group)
+                get_shared_net(conn, line, configuration_id, configuration_name, group, data_list)
         else:
-            get_shared_net(conn, ident, configuration_id, configuration_name, group)
+            get_shared_net(conn, ident, configuration_id, configuration_name, group, data_list)
 
+        for data in data_list:
+            ip=data['ip']
+            if ip not in net_list:
+                if format_list:
+                    for name in format_list:
+                        print(data[name],end=" ")
+                    print()
+                else:
+                    print("IP4Network", data['name'], ip, "shared_network", data['share'])
+                net_list.append(ip)
 
-def get_shared_net(conn, ident, configuration_id, configuration_name, group):
+def get_shared_net(conn, ident, configuration_id, configuration_name, group, data_list):
     """get one shared network"""
     logger = logging.getLogger()
     obj, obj_type = conn.get_obj(ident, configuration_id, "IP4Network", warn=False)
@@ -74,7 +98,7 @@ def get_shared_net(conn, ident, configuration_id, configuration_name, group):
                 configuration_name,
                 "not found",
             )
-            sys.exit(0)
+            return
         # get tag id
         tag_obj = conn.do(
             "getEntityByName", parentId=group_id, name=shared_name, type="Tag"
@@ -96,17 +120,15 @@ def get_shared_net(conn, ident, configuration_id, configuration_name, group):
             "getSharedNetworks",
             tagId=tag_obj["id"],
         )
-        for net_obj in network_obj_list:
-            # print(net_obj)
-            print(
-                net_obj["type"],
-                net_obj["name"],
-                net_obj["properties"]["CIDR"],
-                "shared_network",
-                net_obj["properties"]["sharedNetwork"],
-            )
+        for obj in network_obj_list:
+            # print(obj)
+            data={'input': ident, 'name': obj["name"], 'ip': obj["properties"]["CIDR"],
+                'share': obj["properties"]["sharedNetwork"]}
+            data_list.append(data)
     else:
-        print(obj["type"], obj["name"], obj["properties"]["CIDR"], "not-shared")
+        data={'input': ident, 'name': obj["name"], 'ip': obj["properties"]["CIDR"],
+                'share': "not-shared"}
+        data_list.append(data)
 
 
 if __name__ == "__main__":
