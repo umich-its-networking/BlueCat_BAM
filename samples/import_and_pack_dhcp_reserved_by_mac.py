@@ -298,7 +298,7 @@ def walk_subnet(
     current_ip = first_ip
     needed = len(mac_import_dict)
     later_ip_list = []
-    while current_ip != last_ip and needed > 0:
+    while current_ip != last_ip and needed > 0: # pylint: disable=R1702
         logger.info("current %s", current_ip)
         ip_obj = ip_dict.get(current_ip)
         if ip_obj:

@@ -483,7 +483,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                obj_list = self.get_obj_lines(f, containerId, rangetype )
+                obj_list = self.get_obj_lines(f, containerId, rangetype)
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
@@ -495,20 +495,19 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    obj_list = self.get_obj_lines(f, containerId, rangetype )
+                    obj_list = self.get_obj_lines(f, containerId, rangetype)
                 logger.info(obj_list)
                 return obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
         return obj_list
 
-    def get_obj_lines(self, f, containerId, rangetype ):
+    def get_obj_lines(self, fd, containerId, rangetype):
+        '''read lines, get obj, return obj list'''
         obj_list = []
-        for line in f:
+        for line in fd:
             if line.strip() != "":
-                obj, obj_type = self.get_obj(
-                    line.strip(), containerId, rangetype
-                )
+                obj, _ = self.get_obj(line.strip(), containerId, rangetype)
                 if obj and obj["id"]:
                     obj_list.append(obj)
                 else:

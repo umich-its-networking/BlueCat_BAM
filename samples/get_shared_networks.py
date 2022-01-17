@@ -7,11 +7,8 @@ get_shared_networks.py network_ip-or-shared_name
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
-import json
 import re
-import argparse
 import logging
 
 import bluecat_bam
@@ -45,12 +42,12 @@ def main():
             for line in sys.stdin:
                 # remove one line ending
                 line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
-                get_shared_net(conn, line, configuration_id, group)
+                get_shared_net(conn, line, configuration_id, configuration_name, group)
         else:
-            get_shared_net(conn, ident, configuration_id, group)
+            get_shared_net(conn, ident, configuration_id, configuration_name, group)
 
 
-def get_shared_net(conn, ident, configuration_id, group):
+def get_shared_net(conn, ident, configuration_id, configuration_name, group):
     """get one shared network"""
     logger = logging.getLogger()
     obj, obj_type = conn.get_obj(ident, configuration_id, "IP4Network", warn=False)
@@ -58,7 +55,6 @@ def get_shared_net(conn, ident, configuration_id, group):
     shared_name = None
     if obj_type:
         if obj:
-            obj_id = obj["id"]
             shared_name = obj["properties"].get("sharedNetwork")
         else:
             print("ERROR - not found:", ident)
