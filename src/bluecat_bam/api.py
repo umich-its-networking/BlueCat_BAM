@@ -483,13 +483,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                for line in f:
-                    if line.strip() != "":
-                        obj, obj_type = self.get_obj(line.strip(), containerId, rangetype)
-                        if obj and obj['id']:
-                            obj_list.append(obj)
-                        else:
-                            print("not found", line)
+                obj_list = self.get_obj_lines(f, containerId, rangetype )
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
@@ -501,18 +495,24 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    for line in f:
-                        if line.strip() != "":
-                            obj, obj_type = self.get_obj(line.strip(), containerId, rangetype)
-                            if obj and obj['id']:
-                                obj_list.append(obj)
-                            else:
-                                print("not found", line)
-                # remove failed entries
+                    obj_list = self.get_obj_lines(f, containerId, rangetype )
                 logger.info(obj_list)
                 return obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
+        return obj_list
+
+    def get_obj_lines(self, f, containerId, rangetype ):
+        obj_list = []
+        for line in f:
+            if line.strip() != "":
+                obj, obj_type = self.get_obj(
+                    line.strip(), containerId, rangetype
+                )
+                if obj and obj["id"]:
+                    obj_list.append(obj)
+                else:
+                    print("not found", line)
         return obj_list
 
     def get_obj(self, object_ident, containerId, rangetype, warn=True):
@@ -552,8 +552,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                     )
                 else:
                     obj = self.get_range(object_ident, containerId, rangetype)
-                    if obj and obj['id']:
-                        obj_type = obj['type']
+                    if obj and obj["id"]:
+                        obj_type = obj["type"]
                     else:
                         obj = None
             else:  # not an IP or id
@@ -566,7 +566,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     def get_range(self, address, containerId, rangetype):
         """get range - block, network, or dhcp range - by IPv4 or IPv6"""
         logger = logging.getLogger()
-        logger.info("get_range for address: %s, containerId %s, rangetype %s", address, containerId, rangetype)
+        logger.info(
+            "get_range for address: %s, containerId %s, rangetype %s",
+            address,
+            containerId,
+            rangetype,
+        )
         obj = self.do(
             "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
         )

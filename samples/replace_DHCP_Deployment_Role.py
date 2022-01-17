@@ -82,9 +82,7 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        interface = conn.getinterface(
-            args.primaryDHCPservername, configuration_id
-        )
+        interface = conn.getinterface(args.primaryDHCPservername, configuration_id)
         interfaceid = interface["id"]
         logger.info("interface %s", interface)
         if args.failoverDHCPservername:

@@ -6,8 +6,6 @@
 from __future__ import print_function
 
 import os
-import sys
-import json
 import argparse
 import logging
 
@@ -81,10 +79,10 @@ def main():
 
         interface = conn.getinterface(server_name, configuration_id)
         if interface:
-            interface_id = interface['id']
+            interface_id = interface["id"]
             print(interface_id)
         else:
-            print("ERROR - did not find interface for",server_name)
+            print("ERROR - did not find interface for", server_name)
 
 
 if __name__ == "__main__":

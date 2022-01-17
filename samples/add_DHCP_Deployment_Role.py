@@ -10,7 +10,6 @@ add_DHCP_Deployment_Role.py primaryDHCPservername [failoverDHCPservername]
 from __future__ import print_function
 
 import sys
-import json
 import logging
 
 import bluecat_bam
@@ -84,12 +83,10 @@ def main():
         configuration_id = configuration_obj["id"]
 
         interface = conn.getinterface(args.primaryDHCPservername, configuration_id)
-        interfaceid = interface['id']
+        interfaceid = interface["id"]
         if args.failoverDHCPservername:
-            failover = conn.getinterface(
-                args.failoverDHCPservername, configuration_id
-            )
-            failoverid = failover['id']
+            failover = conn.getinterface(args.failoverDHCPservername, configuration_id)
+            failoverid = failover["id"]
             properties = "secondaryServerInterfaceId=" + str(failoverid) + "|"
         else:
             properties = ""

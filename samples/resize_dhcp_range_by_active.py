@@ -135,6 +135,9 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
             print("    previous DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
             if start < lowest_dhcp:
                 lowest_dhcp = start
+        else:
+            # no dhcp range
+            range_obj = None
     logger.debug("lowest_dhcp: %s", lowest_dhcp)
 
     # find limits of active IP's (DHCP_ALLOCATED) (static?) (dhcp reserved?)
@@ -175,9 +178,7 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
         ip += 1
     logger.debug("active %s, free %s", active, current_free)
     diff = free - current_free
-    logger.debug(
-        "desired free %s, current free %s, diff %s", free, current_free, diff
-    )
+    logger.debug("desired free %s, current free %s, diff %s", free, current_free, diff)
 
     # increase range if more free are desired
     # try to increase the range at the end
@@ -233,15 +234,25 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
         print("new start, end, active, dhcpfree", start, end, active, free)
 
         if not checkonly:
-            result = conn.do(
-                "resizeRange",
-                objectId=range_obj["id"],
-                range=newrange,
-                options="convertOrphanedIPAddressesTo=UNALLOCATED",
-            )
-            if result:
-                print(result)
-
+            if range_obj:
+                result = conn.do(
+                    "resizeRange",
+                    objectId=range_obj["id"],
+                    range=newrange,
+                    options="convertOrphanedIPAddressesTo=UNALLOCATED",
+                )
+                if result:
+                    print(result)
+            else:
+                result = conn.do(
+                    "addDHCP4Range",
+                    networkId=networkid,
+                    properties="",
+                    start=str(start),
+                    end=str(end),
+                )
+                if result:
+                    print(result)
             # now print ranges again
             ranges_list = get_dhcp_ranges(networkid, conn)
             for y in ranges_list:

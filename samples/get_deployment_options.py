@@ -115,7 +115,7 @@ def get_deployment_option(conn, args, obj):
         inherited = getprop(option, "inherited")
         print("    ", opt_id, objtype, name, value, inherited)
         # print(json.dumps(option))
-    print() # blank line after each set of lines
+    print()  # blank line after each set of lines
 
 
 if __name__ == "__main__":

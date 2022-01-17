@@ -47,7 +47,9 @@ def main():
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        network_obj_list = conn.get_obj_list(args.network, configuration_id, "IP4Network")
+        network_obj_list = conn.get_obj_list(
+            args.network, configuration_id, "IP4Network"
+        )
         logger.info("network_obj_list: %s", network_obj_list)
 
         # {"id": 17396816, "name": "MYPC-1450", "type": "IP4Address",

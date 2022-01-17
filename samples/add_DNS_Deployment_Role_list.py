@@ -45,9 +45,7 @@ def readserverlist(serverlistfile, conn, configuration_id):
                 print("ERROR - role not valid:", role)
                 sys.exit(1)
 
-            interface = conn.getinterface(
-                server_name, configuration_id
-            )
+            interface = conn.getinterface(server_name, configuration_id)
             if interface:
                 interfaceid = interface["id"]
                 row = (interfaceid, role, server_name)

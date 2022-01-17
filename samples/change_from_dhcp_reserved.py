@@ -90,21 +90,17 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    configuration_name = args.configuration
-    object_ident = args.object_ident
-    rangetype = ""
-
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
             "getEntityByName",
             method="get",
             parentId=0,
-            name=configuration_name,
+            name=args.configuration,
             type="Configuration",
         )
         configuration_id = configuration_obj["id"]
 
-        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(args.object_ident, configuration_id, "")
         logger.info("obj_list: %s", obj_list)
 
         for entity in obj_list:
@@ -124,10 +120,10 @@ def main():
                     count=1000,
                 )
                 # get view of each record
-                hostrec_view_dict={}
+                hostrec_view_dict = {}
                 for host_obj in hostrec_list:
-                    host_id = host_obj['id']
-                    logger.info("host_id %s",host_id)
+                    host_id = host_obj["id"]
+                    logger.info("host_id %s", host_id)
                     hostrec_view_dict[host_id] = conn.getparentview(host_id)
 
                 result = conn.do("delete", objectId=ip["id"])
