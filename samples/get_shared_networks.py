@@ -15,7 +15,7 @@ import bluecat_bam
 
 
 def main():
-    """resize_dhcp_range_by_active.py"""
+    """get_shared_networks.py"""
     config = bluecat_bam.BAM.argparsecommon(
         "get_shared_networks for network name or IP"
     )

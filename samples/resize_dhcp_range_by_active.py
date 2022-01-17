@@ -19,30 +19,6 @@ __progname__ = "resize_dhcp_range_by_active"
 __version__ = "0.1"
 
 
-def get_dhcp_ranges(networkid, conn):
-    """get list of ranges"""
-    logger = logging.getLogger()
-    range_list = conn.get_bam_api_list(
-        "getEntities",
-        parentId=networkid,
-        type="DHCP4Range",
-    )
-    logger.info(range_list)
-    return range_list
-
-
-def get_ip_list(networkid, conn):
-    """get list of IP objects"""
-    logger = logging.getLogger()
-    ip_list = conn.get_bam_api_list(
-        "getEntities",
-        parentId=networkid,
-        type="IP4Address",
-    )
-    logger.info(ip_list)
-    return ip_list
-
-
 def main():
     """resize_dhcp_range_by_active.py"""
     config = bluecat_bam.BAM.argparsecommon(
