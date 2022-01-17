@@ -503,7 +503,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return obj_list
 
     def get_obj_lines(self, fd, containerId, rangetype):
-        '''read lines, get obj, return obj list'''
+        """read lines, get obj, return obj list"""
         obj_list = []
         for line in fd:
             if line.strip() != "":

@@ -124,14 +124,15 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
     # get dhcp ranges
     range_list = conn.get_dhcp_ranges(network_obj["id"])
     range_info_list = conn.make_dhcp_ranges_list(range_list)
-    print_ranges("current",range_info_list)
+    print_ranges("current", range_info_list)
 
-    for r in range_info_list:
-        if r['start'] < new_start:
-            new_start = start
+    if not activeonly:
+        for r in range_info_list:
+            if r["start"] < new_start:
+                new_start = r["start"]
     if not range_info_list:
-                # no dhcp range
-                range_obj = None
+        # no dhcp range
+        range_obj = None
     elif len(range_info_list) > 1:
         print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
         return
@@ -146,11 +147,9 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
         ip_dict = conn.make_ip_dict(ip_list)
         ip_sort = sorted(ip_dict)
         lowest_active = ip_sort[0]
-        new_end = ip_sort[-1]   # highest active
+        new_end = ip_sort[-1]  # highest active
         active = len(ip_list)  # no, assumes all in ranges
-        logger.info(
-            "lowest active: %s, highest active: %s", lowest_active, new_end
-        )
+        logger.info("lowest active: %s, highest active: %s", lowest_active, new_end)
         if lowest_active < new_start:
             new_start = lowest_active
 
@@ -231,48 +230,51 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
         print("new planned start, end, active, dhcpfree", start, end, active, free)
 
         if not checkonly:
-            add_update_range(ranges_list, conn, networkid, start, end)
+            add_update_range(range_obj, conn, networkid, start, end)
             # print resulting range
             range_list = conn.get_dhcp_ranges(network_obj["id"])
             range_info_list = conn.make_dhcp_ranges_list(range_list)
-            print_ranges("new",range_info_list)
+            print_ranges("new", range_info_list)
 
 
-def add_update_range(ranges_list, conn, networkid, start, end):
-                '''add or update range'''
-                newrange = str(start) + "-" + str(end)
-                if range_obj:
-                    result = conn.do(
-                        "resizeRange",
-                        objectId=range_obj["id"],
-                        range=newrange,
-                        options="convertOrphanedIPAddressesTo=UNALLOCATED",
-                    )
-                    if result:
-                        print(result)
-                else:
-                    range_id = conn.do(
-                        "addDHCP4Range",
-                        networkId=networkid,
-                        properties="",
-                        start=str(start),
-                        end=str(end),
-                    )
-                    if not range_id:
-                        print("ERROR adding range")
+def add_update_range(range_obj, conn, networkid, start, end):
+    """add or update range"""
+    newrange = str(start) + "-" + str(end)
+    if range_obj:
+        result = conn.do(
+            "resizeRange",
+            objectId=range_obj["id"],
+            range=newrange,
+            options="convertOrphanedIPAddressesTo=UNALLOCATED",
+        )
+        if result:
+            print(result)
+    else:
+        range_id = conn.do(
+            "addDHCP4Range",
+            networkId=networkid,
+            properties="",
+            start=str(start),
+            end=str(end),
+        )
+        if not range_id:
+            print("ERROR adding range")
 
 
-def print_ranges(msg_prefix,range_info_list):
-            '''print dhcp ranges'''
-            ## range_info_list [ {"start": start, "end": end, "range": dhcp_range} ...]
-            if range_info_list:
-                for y in range_info_list:
-                    start = y["start"]
-                    end = y["end"]
-                    rangesize = int(end) - int(start) + 1
-                    print("    %s DHCP_range: %s-%s\tsize %s" % (msg_prefix, start, end, rangesize))
-            else:
-                print("    DHCP_range: none")
+def print_ranges(msg_prefix, range_info_list):
+    """print dhcp ranges"""
+    ## range_info_list [ {"start": start, "end": end, "range": dhcp_range} ...]
+    if range_info_list:
+        for y in range_info_list:
+            start = y["start"]
+            end = y["end"]
+            rangesize = int(end) - int(start) + 1
+            print(
+                "    %s DHCP_range: %s-%s\tsize %s"
+                % (msg_prefix, start, end, rangesize)
+            )
+    else:
+        print("    DHCP_range: none")
 
 
 if __name__ == "__main__":
