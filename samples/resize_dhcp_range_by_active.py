@@ -136,6 +136,8 @@ def do_dhcp_ranges(network_obj, conn, offset, free, checkonly, activeonly):
     elif len(range_info_list) > 1:
         print("ERROR - cannot handle multiple DHCP ranges, please update by hand")
         return
+    else:
+        range_obj = range_info_list[0]["range"]
 
     logger.info("new_start: %s", new_start)
 
