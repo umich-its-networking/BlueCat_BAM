@@ -13,7 +13,7 @@ import logging
 
 import bluecat_bam
 
-format_items = ['input', 'ip','name','share']
+format_items = ["input", "ip", "name", "share"]
 
 
 def main():
@@ -28,7 +28,10 @@ def main():
         "--group", "-g", help="shared network group name", default="Shared Networks"
     )
     config.add_argument(
-        "--list", nargs="+", default=[], help="space separated output column list: name ip share"
+        "--list",
+        nargs="+",
+        default=[],
+        help="space separated output column list: name ip share",
     )
 
     args = config.parse_args()
@@ -50,26 +53,33 @@ def main():
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(configuration_name)
-        net_list=[] # for dedup
-        data_list=[]
+        net_list = []  # for dedup
+        data_list = []
         if ident == "-":
             for line in sys.stdin:
                 # remove one line ending
                 line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
-                get_shared_net(conn, line, configuration_id, configuration_name, group, data_list)
+                get_shared_net(
+                    conn, line, configuration_id, configuration_name, group, data_list
+                )
         else:
-            get_shared_net(conn, ident, configuration_id, configuration_name, group, data_list)
+            get_shared_net(
+                conn, ident, configuration_id, configuration_name, group, data_list
+            )
 
         for data in data_list:
-            ip=data['ip']
+            ip = data["ip"]
             if ip not in net_list:
                 if format_list:
                     for name in format_list:
-                        print(data[name],end=" ")
+                        print(data[name], end=" ")
                     print()
                 else:
-                    print("IP4Network", data['name'], ip, "shared_network", data['share'])
+                    print(
+                        "IP4Network", data["name"], ip, "shared_network", data["share"]
+                    )
                 net_list.append(ip)
+
 
 def get_shared_net(conn, ident, configuration_id, configuration_name, group, data_list):
     """get one shared network"""
@@ -122,12 +132,20 @@ def get_shared_net(conn, ident, configuration_id, configuration_name, group, dat
         )
         for obj in network_obj_list:
             # print(obj)
-            data={'input': ident, 'name': obj["name"], 'ip': obj["properties"]["CIDR"],
-                'share': obj["properties"]["sharedNetwork"]}
+            data = {
+                "input": ident,
+                "name": obj["name"],
+                "ip": obj["properties"]["CIDR"],
+                "share": obj["properties"]["sharedNetwork"],
+            }
             data_list.append(data)
     else:
-        data={'input': ident, 'name': obj["name"], 'ip': obj["properties"]["CIDR"],
-                'share': "not-shared"}
+        data = {
+            "input": ident,
+            "name": obj["name"],
+            "ip": obj["properties"]["CIDR"],
+            "share": "not-shared",
+        }
         data_list.append(data)
 
 
