@@ -145,7 +145,8 @@ def canonical_mac(mac):
 def get_args():
     """set up and run config parser"""
     config = bluecat_bam.BAM.argparsecommon(
-        "Create DHCP Reserved from imported list, matching by MAC Address, packed without gaps"
+        "Create DHCP Reserved from imported list, matching by MAC Address, "
+        + "packed without gaps"
     )
     config.add_argument(
         "object_ident",
@@ -292,7 +293,8 @@ def walk_subnet(
     configuration_id,
     view_id,
 ):
-    """walk through each IP, first pass, replace active IP's with matching MAC Address"""
+    """walk through each IP, first pass,
+    replace active IP's with matching MAC Address"""
     # IP address in import data is ignored
     logger = logging.getLogger()
     current_ip = first_ip

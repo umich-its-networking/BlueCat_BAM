@@ -142,7 +142,7 @@ def main():
                     )
                     if result:
                         print("addHostRecord result", result)
-                    ## or assignIP4Address  ??
+                    # or assignIP4Address  ??
                     hostname_list.append(host_obj["properties"]["absoluteName"])
                 hostname_out = " ".join(hostname_list)
                 if hostname_list:
