@@ -22,54 +22,6 @@ __progname__ = "add_lease_time"
 __version__ = "0.1"
 
 
-def getserverid(server_name, configuration_id, conn):
-    """get server id, given the server domainname or displayname"""
-    # try by the server domainname
-    interface_obj_list = conn.do(
-        "searchByObjectTypes",
-        keyword=server_name,
-        types="NetworkServerInterface",
-        start=0,
-        count=2,  # error if more than one
-    )
-    if len(interface_obj_list) > 1:
-        print(
-            "ERROR - more than one server interface found",
-            json.dumps(interface_obj_list),
-        )
-        sys.exit(3)
-    interfaceid = interface_obj_list[0]["id"]
-    if interfaceid != 0:
-        obj = conn.do("getParent", entityId=interfaceid)
-        return obj["id"]
-    # server not found by domanname
-    # try by the server display name
-    server_obj_list = conn.do(
-        "getEntitiesByName",
-        parentId=configuration_id,
-        name=server_name,
-        type="Server",
-        start=0,
-        count=2,  # error if more than one
-    )
-    # print(json.dumps(server_obj_list))
-    if len(server_obj_list) > 1:
-        print(
-            "ERROR - found more than one server for name",
-            server_name,
-            json.dumps(server_obj_list),
-        )
-        sys.exit(1)
-    if len(server_obj_list) < 1:
-        print("ERROR - server not found for", server_name)
-        sys.exit(1)
-    server_id = server_obj_list[0]["id"]
-    if server_id == 0:
-        print("ERROR - server not found for name", server_name)
-        sys.exit(1)
-    return server_id
-
-
 def getfield(obj, fieldname):
     """get a field for printing"""
     field = obj.get(fieldname)
@@ -86,9 +38,7 @@ def getprop(obj, fieldname):
 
 
 def main():
-    """
-    add_lease_time.py entityId leasetime
-    """
+    """add_lease_time.py entityId leasetime"""
     config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
         "object_ident",
@@ -106,6 +56,12 @@ def main():
         help='limit to a specific type: "IP4Address", "IP4Block", "IP4Network", '
         + 'or "DHCP4Range"',
         default="",
+    )
+    config.add_argument(
+        "--quiet",
+        "-q",
+        help='return a status code (non-zero = error) and only print warnings',
+        action = 'store_true',
     )
 
     args = config.parse_args()
@@ -127,7 +83,8 @@ def main():
         prop = {}
         dhcpserver_id = 0
         if args.dhcpserver:
-            dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
+            server_obj, interface_obj = conn.getserver(args.dhcpserver, configuration_id)
+            dhcpserver_id = server_obj['id']
             prop["server"] = dhcpserver_id
         # print(prop)
 
@@ -135,19 +92,18 @@ def main():
         entity_list = conn.get_obj_list(object_ident, configuration_id, args.type)
         logger.info(entity_list)
 
+        result = True
         for entity in entity_list:
             entity_id = entity.get("id")
-            objtype = getfield(entity, "type")
-            name = getfield(entity, "name")
-
-            print(
-                "For entity: ",
-                objtype,
-                name,
-                getprop(entity, "CIDR"),
-                getprop(entity, "start"),
-                getprop(entity, "end"),
-            )
+            if not args.quiet:
+                print(
+                    "For entity: ",
+                    getfield(entity, "type"),
+                    getfield(entity, "name"),
+                    getprop(entity, "CIDR"),
+                    getprop(entity, "start"),
+                    getprop(entity, "end"),
+                )
 
             for opt_name in ["default-lease-time", "max-lease-time", "min-lease-time"]:
                 option = conn.do(
@@ -158,7 +114,12 @@ def main():
                 )
                 logger.info(option)
                 if option.get("id"):
-                    print("option", opt_name, "already set to", option["value"])
+                    value = option["value"]
+                    if not args.quiet:
+                        print("option", opt_name, "already set to", value)
+                    if value != args.leasetime:
+                        result = False
+                        print("ERROR - failed to set",getfield(option, "name"), file=sys.stderr)
                 else:
                     option_id = conn.do(
                         "addDHCPServiceDeploymentOption",
@@ -176,14 +137,24 @@ def main():
                         serverId=dhcpserver_id,
                     )
                     logger.info(json.dumps(option))
-                    objtype = getfield(option, "type")
-                    name = getfield(option, "name")
-                    value = getfield(option, "value")
-                    inherited = getprop(option, "inherited")
-                    print(
-                        "    Added deployment option:", objtype, name, value, inherited
-                    )
+                    if not args.quiet:
+                        objtype = getfield(option, "type")
+                        name = getfield(option, "name")
+                        value = getfield(option, "value")
+                        inherited = getprop(option, "inherited")
+                        print(
+                            "    Added deployment option:", objtype, name, value, inherited
+                        )
+                    if value != args.leasetime:
+                        result = False
+                        print("ERROR - failed to set",getfield(option, "name"), file=sys.stderr)
+                        #break   # skip rest of options for this entity
 
+            if result:
+                return 0    # success
+            else:
+                return 1    # failed
 
 if __name__ == "__main__":
-    main()
+    result = main()
+    sys.exit(result)

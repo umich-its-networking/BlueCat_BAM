@@ -606,6 +606,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
 
     def getinterface(self, server_name, configuration_id):
         """get server interface object, given the server name or interface name"""
+        _, interface_obj = self.getserver(server_name, configuration_id)
+        return interface_obj
+
+    def getserver(self,server_name, configuration_id):
+        '''return server and interface objects'''
+        # server_obj, interface_obj = conn.getserver(server_name, configuration_id)
         logger = logging.getLogger()
         interface_obj_list = self.do(
             "searchByObjectTypes",
@@ -635,11 +641,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             )
             for interface in interface_obj_list:
                 print(interface["name"])
-            return None
+            return None,None
         if interface_ok_list:
             interfaceid = interface_ok_list[0]["id"]
             if interfaceid != 0:
-                return interface_ok_list[0]
+                return server_obj, interface_ok_list[0]
 
         # try another method, in case they gave the server display name instead
         server_obj_list = self.do(
@@ -658,14 +664,14 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 server_name,
                 json.dumps(server_obj_list),
             )
-            sys.exit(1)
+            return None,None
         if len(server_obj_list) < 1:
             print("ERROR - server not found for", server_name)
-            sys.exit(1)
+            return None,None
         server_id = server_obj_list[0]["id"]
         if server_id == 0:
             print("ERROR - server not found for name", server_name)
-            sys.exit(1)
+            return None,None
 
         interface_obj_list = self.do(
             "getEntities",
@@ -679,12 +685,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             print(
                 "ERROR - more than one interface found", json.dumps(interface_obj_list)
             )
-            return None
+            return None,None
         interfaceid = interface_obj_list[0]["id"]
         if interfaceid == 0:
             print("ERROR - interface not found")
-            return None
-        return interface_obj_list[0]
+            return None,None
+        return server_obj_list[0], interface_obj_list[0]
 
     def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
         """get list of entities with given fqdn and type"""
