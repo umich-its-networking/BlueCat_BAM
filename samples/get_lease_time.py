@@ -79,8 +79,10 @@ def main():
 
         dhcpserver_id = -1  # -1 shows all
         if args.dhcpserver:
-            server_obj, interface_obj = conn.getserver(args.dhcpserver, configuration_id)
-            dhcpserver_id = server_obj['id']
+            server_obj, interface_obj = conn.getserver(
+                args.dhcpserver, configuration_id
+            )
+            dhcpserver_id = server_obj["id"]
 
         object_ident = args.object_ident
         entity_list = conn.get_obj_list(object_ident, configuration_id, args.type)
@@ -91,7 +93,7 @@ def main():
             objtype = getfield(entity, "type")
             name = getfield(entity, "name")
 
-            if entity['properties'].get('CIDR'):
+            if entity["properties"].get("CIDR"):
                 print(
                     objtype,
                     name,
@@ -103,7 +105,7 @@ def main():
                     name,
                     getprop(entity, "start"),
                     getprop(entity, "end"),
-                    "Options:"
+                    "Options:",
                 )
 
             optionlist = ["default-lease-time", "max-lease-time", "min-lease-time"]
@@ -120,7 +122,7 @@ def main():
                 name = option["name"]
                 value = option["value"]
                 inherited = getprop(option, "inherited")
-                print("    %18s %s   %s" % ( name, value, inherited))
+                print("    %18s %s   %s" % (name, value, inherited))
 
 
 if __name__ == "__main__":

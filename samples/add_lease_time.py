@@ -60,8 +60,8 @@ def main():
     config.add_argument(
         "--quiet",
         "-q",
-        help='return a status code (non-zero = error) and only print warnings',
-        action = 'store_true',
+        help="return a status code (non-zero = error) and only print warnings",
+        action="store_true",
     )
 
     args = config.parse_args()
@@ -83,8 +83,10 @@ def main():
         prop = {}
         dhcpserver_id = 0
         if args.dhcpserver:
-            server_obj, interface_obj = conn.getserver(args.dhcpserver, configuration_id)
-            dhcpserver_id = server_obj['id']
+            server_obj, interface_obj = conn.getserver(
+                args.dhcpserver, configuration_id
+            )
+            dhcpserver_id = server_obj["id"]
             prop["server"] = dhcpserver_id
         # print(prop)
 
@@ -119,7 +121,11 @@ def main():
                         print("option", opt_name, "already set to", value)
                     if value != args.leasetime:
                         result = False
-                        print("ERROR - failed to set",getfield(option, "name"), file=sys.stderr)
+                        print(
+                            "ERROR - failed to set",
+                            getfield(option, "name"),
+                            file=sys.stderr,
+                        )
                 else:
                     option_id = conn.do(
                         "addDHCPServiceDeploymentOption",
@@ -143,17 +149,26 @@ def main():
                         value = getfield(option, "value")
                         inherited = getprop(option, "inherited")
                         print(
-                            "    Added deployment option:", objtype, name, value, inherited
+                            "    Added deployment option:",
+                            objtype,
+                            name,
+                            value,
+                            inherited,
                         )
                     if value != args.leasetime:
                         result = False
-                        print("ERROR - failed to set",getfield(option, "name"), file=sys.stderr)
-                        #break   # skip rest of options for this entity
+                        print(
+                            "ERROR - failed to set",
+                            getfield(option, "name"),
+                            file=sys.stderr,
+                        )
+                        # break   # skip rest of options for this entity
 
             if result:
-                return 0    # success
+                return 0  # success
             else:
-                return 1    # failed
+                return 1  # failed
+
 
 if __name__ == "__main__":
     result = main()
