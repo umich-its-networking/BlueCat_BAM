@@ -658,39 +658,34 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             count=2,  # error if more than one
         )
         # print(json.dumps(server_obj_list))
+        if len(server_obj_list) == 1:
+            server_id = server_obj_list[0]["id"]
+            if server_id != 0:
+                interface_obj_list = self.do(
+                    "getEntities",
+                    method="get",
+                    parentId=server_id,
+                    type="NetworkServerInterface",
+                    start=0,
+                    count=1000,
+                )
+                if len(interface_obj_list) == 1:
+                    interfaceid = interface_obj_list[0]["id"]
+                    if interfaceid != 0:
+                        return server_obj_list[0], interface_obj_list[0]
+                if len(interface_obj_list) > 1:
+                    print(
+                        "ERROR - more than one interface found", json.dumps(interface_obj_list)
+                    )
         if len(server_obj_list) > 1:
             print(
                 "ERROR - found more than one server for name",
                 server_name,
                 json.dumps(server_obj_list),
             )
-            return None, None
-        if len(server_obj_list) < 1:
-            print("ERROR - server not found for", server_name)
-            return None, None
-        server_id = server_obj_list[0]["id"]
-        if server_id == 0:
-            print("ERROR - server not found for name", server_name)
-            return None, None
+        print("ERROR - server or interface not found for", server_name)
+        return None, None
 
-        interface_obj_list = self.do(
-            "getEntities",
-            method="get",
-            parentId=server_id,
-            type="NetworkServerInterface",
-            start=0,
-            count=1000,
-        )
-        if len(interface_obj_list) > 1:
-            print(
-                "ERROR - more than one interface found", json.dumps(interface_obj_list)
-            )
-            return None, None
-        interfaceid = interface_obj_list[0]["id"]
-        if interfaceid == 0:
-            print("ERROR - interface not found")
-            return None, None
-        return server_obj_list[0], interface_obj_list[0]
 
     def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
         """get list of entities with given fqdn and type"""
@@ -831,3 +826,56 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             for ip_obj in ip_list
         }
         return ip_dict
+
+
+class dhcp_range_list(list):
+    """make a dhcp range list object, with function to check if in range,
+    list must be in format from make_dhcp_ranges_list"""
+
+    def __init__(
+        self,
+        conn,
+        network_obj,
+        dhcp_ranges_list,   # sorted list with start/end from make_dhcp_ranges_list
+    ):
+        """save network, range list, and current range"""
+        self.network_obj = network_obj
+        self.ranges = dhcp_ranges_list
+        self.range_num = 0
+        # calculate network start/end
+        self.cidr = network_obj["properties"]["CIDR"]
+        self.network_net = ipaddress.IPv4Network(cidr)
+        self.network_ip = network_net.network_address
+        self.broadcast_ip = network_net.broadcast_address
+        # start with gap from network_ip to before first range
+        self.start = self.network_ip
+        if self.dhcp_ranges_list:
+            # range list must be sorted
+            self.end = self.ranges[0]['start']
+        else:
+            # no range_size
+            self.end = self.broadcast_ip
+        in_range=False
+
+    # __enter__ from our parent class returns the list object for us
+
+    def in_range(ip):
+        # note that this is most efficient if IP's are checked in ascending order
+        if ip >= self.start:
+            if ip <= self.end:
+                # in same area, give same answer, for speed
+                return in_range
+            # sanity check - if in network
+            if ip > self.broadcast_ip:
+                return False
+            # could be in gap before the range
+            if not in_range and ip < self.dhcp_ranges_list[self.range_num]['start']:
+                return False
+            # otherwise, search for answer in forward direction
+            while self.range_num < len(self.dhcp_ranges_list):
+                if ip <= self.dhcp_ranges_list[self.range_num]['end']:
+                    if ip >= self.dhcp_ranges_list[self.range_num]['start']:
+                        return True
+                    return False
+                # move to next range
+                self.range_num += 1
