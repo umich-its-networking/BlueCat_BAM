@@ -171,5 +171,5 @@ def main():
 
 
 if __name__ == "__main__":
-    result = main()
-    sys.exit(result)
+    resultm = main()
+    sys.exit(resultm)

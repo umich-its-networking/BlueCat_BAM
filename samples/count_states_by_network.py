@@ -63,8 +63,10 @@ def main():
             for ip in ip_obj_list:
                 ip_dict[ip["properties"]["address"]] = ip
 
-            range_list = get_dhcp_ranges(networkid, conn)
-            range_info_list = get_dhcp_ranges_info(range_list)
+            range_list = conn.get_dhcp_ranges(networkid)
+            print(range_list)
+            range_info_list = conn.make_dhcp_ranges_list(range_list)
+            print(range_info_list)
 
             # print(network)
             cidr = network["properties"]["CIDR"]
@@ -80,19 +82,20 @@ def main():
 
 def print_counts(count_in, count_out):
     """print counts"""
-    print("in ranges:")
+    location = "inside ranges: "
     for state in sorted(count_in.keys()):
         count = count_in[state]
-        print(count, state)
-    print("outside ranges:")
+        print(location, count, state)
+    location = "outside ranges:"
     for state in sorted(count_out.keys()):
         count = count_out[state]
-        print(count, state)
+        print(location, count, state)
 
 
 def count_network(network_net, range_info_list, ip_dict):
     """count states in a network"""
     # in_range=False    # future - count in each range
+    # note that range_info_list is sorted
     i = 0
     (rangestart, rangeend) = get_info(i, range_info_list, network_net)
     count_in = {}  # in DHCP ranges

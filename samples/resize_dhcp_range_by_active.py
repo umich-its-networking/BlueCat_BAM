@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-resize_dhcp_range_by_active.py network-or-filename free
-[--cfg configuration] [--view viewname]
+resize_dhcp_range_by_active.py network-or-filename offset free
+[--checkonly] [--activeonly]
 """
 
 

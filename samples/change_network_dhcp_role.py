@@ -100,6 +100,9 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
     print(json.dumps(dhcp_role))
 
+    if not dhcp_role:
+        print("role not found for", networkid)
+        raise exception
     roleid = dhcp_role["id"]
     svr_int_id = dhcp_role["serverInterfaceId"]
     sec_svr_int_id = dhcp_role["properties"]["secondaryServerInterfaceId"]
