@@ -154,7 +154,7 @@ def main():
                     serverId=dhcpserver_id,
                 )
                 logger.info(json.dumps(option))
-                if option.get("id") == 0:
+                if not option.get("id"):
                     print("no option", opt_name, "at this level, cannot delete")
                 else:
                     objtype = getfield(option, "type")
@@ -172,28 +172,21 @@ def main():
                     if result:
                         print("result: ", result)
 
-            options = conn.do(
-                "getDeploymentOptions",
-                entityId=entity_id,
-                optionTypes="DHCPServiceOption",
-                serverId=-1,
-            )
-            logger.info(json.dumps(options))
-            printoptions(options, optionlist)
-
-
-def printoptions(options, optionlist):
-    """print options"""
-    print("Options are now:")
-    for option in options:
-        if optionlist and option.get("name") not in optionlist:
-            continue
-        opt_id = getfield(option, "id")
-        objtype = getfield(option, "type")
-        name = getfield(option, "name")
-        value = getfield(option, "value")
-        inherited = getprop(option, "inherited")
-        print("    ", opt_id, objtype, name, value, inherited)
+            for opt_name in optionlist:
+                option = conn.do(
+                    "getDHCPServiceDeploymentOption",
+                    entityId=entity_id,
+                    name=opt_name,
+                    serverId=dhcpserver_id,
+                )
+                logger.info(json.dumps(option))
+                if option.get("id"):
+                    opt_id = getfield(option, "id")
+                    objtype = getfield(option, "type")
+                    name = getfield(option, "name")
+                    value = getfield(option, "value")
+                    inherited = getprop(option, "inherited")
+                    print("    ", opt_id, objtype, name, value, inherited)
 
 
 if __name__ == "__main__":

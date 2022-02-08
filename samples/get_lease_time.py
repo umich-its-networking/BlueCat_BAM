@@ -11,7 +11,6 @@ get_lease_time.py entity
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 
@@ -79,9 +78,7 @@ def main():
 
         dhcpserver_id = -1  # -1 shows all
         if args.dhcpserver:
-            server_obj, interface_obj = conn.getserver(
-                args.dhcpserver, configuration_id
-            )
+            server_obj, _ = conn.getserver(args.dhcpserver, configuration_id)
             dhcpserver_id = server_obj["id"]
 
         object_ident = args.object_ident

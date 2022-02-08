@@ -83,9 +83,7 @@ def main():
         prop = {}
         dhcpserver_id = 0
         if args.dhcpserver:
-            server_obj, interface_obj = conn.getserver(
-                args.dhcpserver, configuration_id
-            )
+            server_obj, _ = conn.getserver(args.dhcpserver, configuration_id)
             dhcpserver_id = server_obj["id"]
             prop["server"] = dhcpserver_id
         # print(prop)
@@ -96,78 +94,87 @@ def main():
 
         result = True
         for entity in entity_list:
-            entity_id = entity.get("id")
+            result1 = add_lease_time_to_entity(entity, args, conn, prop, dhcpserver_id)
+            if result1 == 1:
+                result = 1  # Failed
+        return result
+
+
+def add_lease_time_to_entity(entity, args, conn, prop, dhcpserver_id):
+    """add lease time"""
+    logger = logging.getLogger()
+    result=True
+    entity_id = entity.get("id")
+    if not args.quiet:
+        print(
+            "For entity: ",
+            getfield(entity, "type"),
+            getfield(entity, "name"),
+            getprop(entity, "CIDR"),
+            getprop(entity, "start"),
+            getprop(entity, "end"),
+        )
+
+    for opt_name in ["default-lease-time", "max-lease-time", "min-lease-time"]:
+        option = conn.do(
+            "getDHCPServiceDeploymentOption",
+            entityId=entity_id,
+            name=opt_name,
+            serverId=dhcpserver_id,
+        )
+        logger.info(option)
+        if option.get("id"):
+            value = option["value"]
             if not args.quiet:
+                print("option", opt_name, "already set to", value)
+            if value != args.leasetime:
+                result = False
                 print(
-                    "For entity: ",
-                    getfield(entity, "type"),
-                    getfield(entity, "name"),
-                    getprop(entity, "CIDR"),
-                    getprop(entity, "start"),
-                    getprop(entity, "end"),
+                    "ERROR - failed to set",
+                    getfield(option, "name"),
+                    file=sys.stderr,
                 )
+        else:
+            option_id = conn.do(
+                "addDHCPServiceDeploymentOption",
+                entityId=entity_id,
+                name=opt_name,
+                value=args.leasetime,
+                properties=prop,
+            )
+            logger.info(option_id)
 
-            for opt_name in ["default-lease-time", "max-lease-time", "min-lease-time"]:
-                option = conn.do(
-                    "getDHCPServiceDeploymentOption",
-                    entityId=entity_id,
-                    name=opt_name,
-                    serverId=dhcpserver_id,
+            option = conn.do(
+                "getDHCPServiceDeploymentOption",
+                entityId=entity_id,
+                name=opt_name,
+                serverId=dhcpserver_id,
+            )
+            logger.info(json.dumps(option))
+            if not args.quiet:
+                objtype = getfield(option, "type")
+                name = getfield(option, "name")
+                value = getfield(option, "value")
+                inherited = getprop(option, "inherited")
+                print(
+                    "    Added deployment option:",
+                    objtype,
+                    name,
+                    value,
+                    inherited,
                 )
-                logger.info(option)
-                if option.get("id"):
-                    value = option["value"]
-                    if not args.quiet:
-                        print("option", opt_name, "already set to", value)
-                    if value != args.leasetime:
-                        result = False
-                        print(
-                            "ERROR - failed to set",
-                            getfield(option, "name"),
-                            file=sys.stderr,
-                        )
-                else:
-                    option_id = conn.do(
-                        "addDHCPServiceDeploymentOption",
-                        entityId=entity_id,
-                        name=opt_name,
-                        value=args.leasetime,
-                        properties=prop,
-                    )
-                    logger.info(option_id)
+            if option["value"] != args.leasetime:
+                result = False
+                print(
+                    "ERROR - failed to set",
+                    getfield(option, "name"),
+                    file=sys.stderr,
+                )
+                # break   # skip rest of options for this entity
 
-                    option = conn.do(
-                        "getDHCPServiceDeploymentOption",
-                        entityId=entity_id,
-                        name=opt_name,
-                        serverId=dhcpserver_id,
-                    )
-                    logger.info(json.dumps(option))
-                    if not args.quiet:
-                        objtype = getfield(option, "type")
-                        name = getfield(option, "name")
-                        value = getfield(option, "value")
-                        inherited = getprop(option, "inherited")
-                        print(
-                            "    Added deployment option:",
-                            objtype,
-                            name,
-                            value,
-                            inherited,
-                        )
-                    if value != args.leasetime:
-                        result = False
-                        print(
-                            "ERROR - failed to set",
-                            getfield(option, "name"),
-                            file=sys.stderr,
-                        )
-                        # break   # skip rest of options for this entity
-
-            if result:
-                return 0  # success
-            else:
-                return 1  # failed
+    if result:
+        return 0  # success
+    return 1  # failed
 
 
 if __name__ == "__main__":
