@@ -11,8 +11,6 @@ add_DHCP_deployment_option.py entity optionname optionvalue --properties propert
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
-import json
 import logging
 
 import bluecat_bam
@@ -26,7 +24,7 @@ def getfield(obj, fieldname):
     """get a field for printing"""
     field = obj.get(fieldname)
     if field:
-        output = fieldname + ": " + field + ", "
+        output = fieldname + ": " + field + ",\t"
     else:
         output = ""
     return output
@@ -139,12 +137,16 @@ def main():
                 name=args.optionname,
                 serverId=dhcpserver_id,
             )
-            logger.info(json.dumps(option))
-            objtype = getfield(option, "type")
-            name = getfield(option, "name")
-            value = getfield(option, "value")
-            inherited = getprop(option, "inherited")
-            print("    Added deployment option:", objtype, name, value, inherited)
+            print(
+                "    Added %s: type %s,\tname %s,\tvalue %s,\tinherited %s"
+                % (
+                    "deployment option",
+                    option["type"],
+                    option["name"],
+                    option["value"],
+                    option["properties"]["inherited"],
+                )
+            )
 
 
 if __name__ == "__main__":

@@ -11,7 +11,6 @@ delete_lease_time.py entity
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 
@@ -110,16 +109,15 @@ def main():
                 if not option.get("id"):
                     print("no option", opt_name, "at this level, cannot delete")
                 else:
-                    objtype = getfield(option, "type")
-                    name = getfield(option, "name")
-                    value = getfield(option, "value")
-                    inherited = getprop(option, "inherited")
                     print(
-                        "    deleting deployment option:",
-                        objtype,
-                        name,
-                        value,
-                        inherited,
+                        "    deleting %s: type %s,\tname %s,\tvalue %s,\tinherited %s"
+                        % (
+                            "deployment option",
+                            option["type"],
+                            option["name"],
+                            option["value"],
+                            option["properties"]["inherited"],
+                        )
                     )
                     result = conn.do("delete", objectId=option["id"])
                     if result:
@@ -134,12 +132,16 @@ def main():
                 )
                 logger.info(json.dumps(option))
                 if option.get("id"):
-                    opt_id = getfield(option, "id")
-                    objtype = getfield(option, "type")
-                    name = getfield(option, "name")
-                    value = getfield(option, "value")
-                    inherited = getprop(option, "inherited")
-                    print("    ", opt_id, objtype, name, value, inherited)
+                    print(
+                        "    id %s,\ttype %s,\tname %s,\tvalue %s,\tinherited %s"
+                        % (
+                            option["id"],
+                            option["type"],
+                            option["name"],
+                            option["value"],
+                            option["properites"]["inherited"],
+                        )
+                    )
 
 
 if __name__ == "__main__":
