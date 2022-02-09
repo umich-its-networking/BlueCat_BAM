@@ -9,6 +9,16 @@ import bluecat_bam
 
 def test_make_dhcp_ranges_list():
     """make_dhcp_ranges_list"""
+    network_obj = {
+        "id": 10490777,
+        "name": "V-BLUECAT-TEST-2",
+        "type": "IP4Network",
+        "properties": {
+            "CIDR": "10.213.152.224/27",
+            "gateway": "10.213.152.225",
+            "defaultView": "1048598",
+        },
+    }
     range_list = [
         {
             "id": 17254380,
@@ -30,7 +40,7 @@ def test_make_dhcp_ranges_list():
         },
     ]
 
-    dhcp_ranges_list = bluecat_bam.api.make_dhcp_ranges_list(range_list)
+    dhcp_ranges_list = bluecat_bam.DhcpRangeList(range_list, network_obj)
 
     expected = [
         {

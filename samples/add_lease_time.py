@@ -103,7 +103,7 @@ def main():
 def add_lease_time_to_entity(entity, args, conn, prop, dhcpserver_id):
     """add lease time"""
     logger = logging.getLogger()
-    result=True
+    result = True
     entity_id = entity.get("id")
     if not args.quiet:
         print(

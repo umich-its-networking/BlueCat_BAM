@@ -636,9 +636,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             if server_configuration["id"] == configuration_id:
                 interface_ok_list.append(interface)
         if len(interface_ok_list) > 1:
-            print(
-                "ERROR - more than one interface found:"
-            )
+            print("ERROR - more than one interface found:")
             for interface in interface_ok_list:
                 print(interface["name"])
             return None, None
@@ -649,6 +647,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return None, None
 
     def getserverbyservername(self, server_name, configuration_id):
+        """get server by servername"""
         # try another method, in case they gave the server display name instead
         server_obj_list = self.do(
             "getEntitiesByNameUsingOptions",
@@ -686,16 +685,19 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 server_name,
                 json.dumps(server_obj_list),
             )
-        return server_obj, interface_ok_list[0]
+        return None, None
 
     def getserver(self, server_name, configuration_id):
         """return server and interface objects"""
         # server_obj, interface_obj = conn.getserver(server_name, configuration_id)
-        logger = logging.getLogger()
 
-        server_obj, interface_obj = self.getserverbyinterfacename(self, server_name, configuration_id)
+        server_obj, interface_obj = self.getserverbyinterfacename(
+            server_name, configuration_id
+        )
         if not server_obj:
-            server_obj, interface_obj = self.getserverbyservername(self, server_name, configuration_id)
+            server_obj, interface_obj = self.getserverbyservername(
+                server_name, configuration_id
+            )
         if not server_obj:
             print("ERROR - server or interface not found for", server_name)
         return server_obj, interface_obj
@@ -847,12 +849,12 @@ class DhcpRangeList(list):  # pylint: disable=R0902
 
     def __init__(
         self,
-        conn,
-        network_obj,
         dhcp_ranges_list,  # sorted list with start/end from make_dhcp_ranges_list
+        network_obj,
     ):
-        """save network, range list, and current range"""
-        list.__init__(self, dhcp_ranges_list)
+        """DHCP range list, with extra functions"""
+        list.__init__(self, BAM.make_dhcp_ranges_list(dhcp_ranges_list))
+        # save network, range list, and current range
         self.network_obj = network_obj
         self.ranges = dhcp_ranges_list
         self.range_num = 0
@@ -863,10 +865,10 @@ class DhcpRangeList(list):  # pylint: disable=R0902
         self.broadcast_ip = self.network_net.broadcast_address
         # start with gap from network_ip to before first range
         self.gap = self.network_ip
-        if self.dhcp_ranges_list:
+        if self.__len__() > 0:
             # range list must be sorted
-            self.start = self.ranges[0]["start"]
-            self.end = self.ranges[0]["end"]
+            self.start = self[0]["start"]
+            self.end = self[0]["end"]
         else:
             # no range_size, put start after end so it never matches
             self.start = self.broadcast_ip + 1
@@ -890,9 +892,9 @@ class DhcpRangeList(list):  # pylint: disable=R0902
         if ip < self.network_ip or ip > self.broadcast_ip:
             return False
         # search ranges
-        while self.range_num < len(self.dhcp_ranges_list):
-            if ip <= self.dhcp_ranges_list[self.range_num]["end"]:
-                if ip >= self.dhcp_ranges_list[self.range_num]["start"]:
+        while self.range_num < self.__len__():
+            if ip <= self[self.range_num]["end"]:
+                if ip >= self[self.range_num]["start"]:
                     return True
                 return False
             # move to next range
