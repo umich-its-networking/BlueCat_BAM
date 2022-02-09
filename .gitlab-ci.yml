@@ -36,7 +36,7 @@ bandit:
   image: python:latest
   script:
   - pip install bandit
-  - bandit -r .
+  - bandit -s B101 -r $files
 
 test-py35:
   image: python:3.5-stretch
