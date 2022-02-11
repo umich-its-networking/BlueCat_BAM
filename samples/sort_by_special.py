@@ -102,10 +102,14 @@ def sort_by_special(lines, regex, sort_type):  # pylint: disable=R0912
                 continue
         elif sort_type == "mac":
             s = re.search(
-                r"((?:[0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2})($|[^:0-9a-fA-F])", line
+                r"""(^|[^:0-9a-fA-F])((?:[0-9a-fA-F]{1,2}[-:.]){5}
+                [0-9a-fA-F]{1,2}|[0-9a-fA-F]{12})($|[^:0-9a-fA-F-])""",
+                line,
+                re.X,
             )
             if s:
-                sort_key = canonical_mac(s.group(1))
+                sort_key = canonical_mac(s.group(2))
+                # print("mac key /%s/" % sort_key)
             else:
                 print(line, file=sys.stderr)
                 continue
@@ -134,13 +138,20 @@ def sort_by_special(lines, regex, sort_type):  # pylint: disable=R0912
 
 def canonical_mac(mac):
     """reformat mac address to be sure there are always two hex digits"""
-    hex_list = mac.split(":")
+    # hex_list = mac.split(":")
+    hex_list = re.split(r"[-:.]", mac)
+    if len(hex_list) == 1:
+        hex_list = re.search(r"^(..)(..)(..)(..)(..)(..)$", mac).groups()
+    # s = re.search(r"([0-9a-fA-F]{1,2}[-:.]?){5}([0-9a-fA-F]{1,2})", mac)
+    # if s:
+    #    for g in s.groups():
+    #        print("group",g)
     out_list = []
     for h in hex_list:
         if len(h) == 1:
             h = "0" + h
         # h = format(h, "02x")
-        out_list.append(h)
+        out_list.append(h.lower())
     hexout = ":".join(out_list)
     return hexout
 
