@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-prep_network_for_wifi_swap.py [offset [freecount]] < list-of-networkIP
+prep_network_for_wifi_swap.py [--offset nn] [--free nn] < list-of-networkIP
 
 In the range needed for new devices,
 Replace DHCP Reserved records with DHCP Allocated, and recreate any HostRecord's
@@ -119,7 +119,8 @@ def prep_one_network(conn, network_obj, offset, free):
     # get dhcp ranges
     range_list = conn.get_dhcp_ranges(networkid)
     range_info_list = conn.make_dhcp_ranges_list(range_list)
-    print("current", range_info_list)
+    # print("current", range_info_list)
+    print_ranges("current", range_info_list)
     if len(range_info_list) > 1:
         print("ERROR - cannot handle multiple DHCP ranges, skipping")
         return
@@ -142,11 +143,31 @@ def prep_one_network(conn, network_obj, offset, free):
     # for now, only allow one range
     range_obj = range_info_list[0]["range"]
     add_update_range(range_obj, conn, networkid, start, end)
+    # print resulting range
+    range_list = conn.get_dhcp_ranges(networkid)
+    range_info_list = conn.make_dhcp_ranges_list(range_list)
+    print_ranges("    new", range_info_list)
 
     # inside range, "convert" DHCP_RESERVED to DHCP_ALLOCATED
     # cannot convert, so delete, recreate the host records,
     # and let renew create the DHCP_ALLOCATED
     convert_dhcp_reserved_to_allocated(conn, ip_dict, start, end)
+
+
+def print_ranges(msg_prefix, range_info_list):
+    """print dhcp ranges"""
+    # range_info_list [ {"start": start, "end": end, "range": dhcp_range} ...]
+    if range_info_list:
+        for y in range_info_list:
+            start = y["start"]
+            end = y["end"]
+            rangesize = int(end) - int(start) + 1
+            print(
+                "    %s DHCP_range: %s-%s\tsize %s"
+                % (msg_prefix, start, end, rangesize)
+            )
+    else:
+        print("    DHCP_range: none")
 
 
 def count_types(ip_dict):

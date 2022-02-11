@@ -111,7 +111,7 @@ def do_dhcp_ranges(network_obj, conn, size, offset):  # pylint: disable=R0914
     # print resulting range
     range_list = conn.get_dhcp_ranges(networkid)
     range_info_list = conn.make_dhcp_ranges_list(range_list)
-    print_ranges("new", range_info_list)
+    print_ranges("    new", range_info_list)
 
 
 def find_open_space(offset, network_ip, broadcast_ip, ip_dict, size):
@@ -151,7 +151,7 @@ def find_open_space(offset, network_ip, broadcast_ip, ip_dict, size):
         print("no room for range found")
         return None, None
     # break jumps to here
-    print("new range start", start, "end", end)
+    # print("new range start", start, "end", end)
     return start, end
 
 
