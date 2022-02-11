@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 """
-move_dhcp_range_to_free.py network-or-filename free
-[--cfg configuration] [--view viewname]
+move_dhcp_range_to_free.py network-or-filename size [--offset nn]
 """
 
 
@@ -30,6 +29,11 @@ def main():
         + "or a filename or stdin('-') with any of those on each line ",
     )
     config.add_argument("size", help="desired size of DHCP range, ")
+    config.add_argument(
+        "--offset",
+        help="offset of DHCP range from beginning of network (default 5)",
+        default="0",  # will convert to integer
+    )
 
     args = config.parse_args()
 
@@ -40,6 +44,7 @@ def main():
     network_ident = args.network_ident
     rangetype = "IP4Network"
     size = int(args.size)
+    offset = int(args.offset)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
@@ -54,12 +59,13 @@ def main():
                 % (network_obj["name"], cidr, ipaddress.IPv4Network(cidr).num_addresses)
             )
             # print(network_obj)
-            do_dhcp_ranges(network_obj, conn, size)
+            do_dhcp_ranges(network_obj, conn, size, offset)
 
 
-def do_dhcp_ranges(network_obj, conn, size):  # pylint: disable=R0914
+def do_dhcp_ranges(network_obj, conn, size, offset):  # pylint: disable=R0914
     """do dhcp ranges"""
     logger = logging.getLogger()
+    # get network info
     networkid = network_obj["id"]
     cidr = network_obj["properties"]["CIDR"]
     netsize = ipaddress.IPv4Network(cidr).num_addresses
@@ -80,15 +86,14 @@ def do_dhcp_ranges(network_obj, conn, size):  # pylint: disable=R0914
     range_list = conn.get_dhcp_ranges(network_obj["id"])
     range_info_list = conn.make_dhcp_ranges_list(range_list)
     print_ranges("current", range_info_list)
-    if range_info_list:
-        range_dict = range_info_list[0]
-        range_obj = range_dict["range"]
-    else:
-        range_obj = None
-
     if len(range_info_list) > 1:
         print("ERROR - cannot resize multiple DHCP ranges, please update by hand")
         return
+    if range_info_list:
+        range_dict = range_info_list[0]  # only one DHCP range handled
+        range_obj = range_dict["range"]
+    else:
+        range_obj = None
     logger.info("start: %s", start)
 
     # find limits of active IP's (DHCP_ALLOCATED and DHCP_RESERVED)
@@ -101,83 +106,53 @@ def do_dhcp_ranges(network_obj, conn, size):  # pylint: disable=R0914
         if lowest_active < start:
             start = lowest_active
 
-    # choose outer limits
-    if start == broadcast_ip:
-        # no dhcp range, no active ip
-        print("no dhcp ranges and no active ip")
-        start = network_ip + size
-    end = max(end, start - 1)
-    range_size = int(end) - int(start) + 1
-    logger.info("initial range %s to %s, size %s", start, end, range_size)
-
-    start, end, active = add_free(
-        start, end, ip_dict, network_ip, broadcast_ip, range_size
-    )
-
-    # decide new range
-    if end < start:
-        print("no dhcp range due to no active and no free requested")
-    else:
-        rangesize = int(end) - int(start) + 1
-        avail_free = rangesize - active
-        print(
-            "new planned start, end, size, active, dhcpfree",
-            start,
-            end,
-            rangesize,
-            active,
-            avail_free,
-        )
-
-        add_update_range(range_obj, conn, networkid, start, end)
-        # print resulting range
-        range_list = conn.get_dhcp_ranges(networkid)
-        range_info_list = conn.make_dhcp_ranges_list(range_list)
-        print_ranges("new", range_info_list)
+    start, end = find_open_space(offset, network_ip, broadcast_ip, ip_dict, size)
+    add_update_range(range_obj, conn, networkid, start, end)
+    # print resulting range
+    range_list = conn.get_dhcp_ranges(networkid)
+    range_info_list = conn.make_dhcp_ranges_list(range_list)
+    print_ranges("new", range_info_list)
 
 
-def add_free(start, end, ip_dict, network_ip, broadcast_ip, size):
-    """expand range to match desired free"""
-    logger = logging.getLogger()
-    # count active in range
-    active = 0
-    current_free = 0
+def find_open_space(offset, network_ip, broadcast_ip, ip_dict, size):
+    """search for open space to fit range"""
+    if not offset:
+        offset = 5
+    start = network_ip + offset
     ip = start
-    while ip <= end:
-        if ip_dict.get(ip):
-            active += 1
-        else:
-            current_free += 1
+    mysize = 0
+    while ip < broadcast_ip:
+        # print("checking",ip)
+        obj = ip_dict.get(ip)
+        if obj:
+            # print("found",obj)
+            state = obj["properties"]["state"]
+            if state in ("DHCP_ALLOCATED", "STATIC"):
+                mysize += 1
+                if mysize >= size:
+                    end = ip
+                    break
+                # else
+                ip += 1
+                continue
+            # else:
+            ip += 1
+            start = ip
+            mysize = 0
+            continue
+        # else
+        mysize += 1
+        if mysize >= size:
+            end = ip
+            break
         ip += 1
-    logger.info("active in range %s, free %s", active, current_free)
-    diff = size - current_free
-    logger.info("desired free %s, current free %s, diff %s", size, current_free, diff)
 
-    # increase range if more free are desired
-    limit1 = network_ip + 3
-    limit2 = broadcast_ip
-
-    # try to increase the range at the end
-    ip = end
-    step = 1
-    ip, diff, active = expand_range(ip, step, limit1, limit2, diff, active, ip_dict)
-    end = ip
-    range_size = int(end) - int(start) + 1
-    logger.info(
-        "range now %s to %s, size %s, diff %s", str(start), str(end), range_size, diff
-    )
-
-    # try to increase the range at the start
-    ip = start
-    step = -1
-    ip, diff, active = expand_range(ip, step, limit1, limit2, diff, active, ip_dict)
-    start = ip
-    range_size = int(end) - int(start) + 1
-    logger.info(
-        "new range %s to %s, size %s, diff %s", str(start), str(end), range_size, diff
-    )
-
-    return start, end, active
+    else:  # end of while goes here
+        print("no room for range found")
+        return None, None
+    # break jumps to here
+    print("new range start", start, "end", end)
+    return start, end
 
 
 def get_ip_dict(conn, networkid):
@@ -187,27 +162,6 @@ def get_ip_dict(conn, networkid):
     if ip_list:
         ip_dict = conn.make_ip_dict(ip_list)
     return ip_dict
-
-
-def expand_range(ip, step, limit1, limit2, diff, active, ip_dict):
-    """returns ip, diff, active"""
-    logger = logging.getLogger()
-    while diff > 0:
-        prev = ip
-        ip += step  # next IP to check
-        ip_obj = ip_dict.get(ip)
-        logger.info("checking %s", str(ip))
-        if ip <= limit1 or ip >= limit2:
-            ip = prev
-            logger.info("hit limit, use %s", str(ip))
-            break
-        if ip_obj:
-            logger.info("active %s", str(ip_obj))
-            active += 1
-        else:
-            logger.info("not active %s", str(ip))
-            diff -= 1
-    return ip, diff, active
 
 
 def add_update_range(range_obj, conn, networkid, start, end):

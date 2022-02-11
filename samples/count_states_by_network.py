@@ -64,9 +64,9 @@ def main():
                 ip_dict[ip["properties"]["address"]] = ip
 
             range_list = conn.get_dhcp_ranges(networkid)
-            print(range_list)
+            # print(range_list)
             range_info_list = conn.make_dhcp_ranges_list(range_list)
-            print(range_info_list)
+            # print(range_info_list)
 
             # print(network)
             cidr = network["properties"]["CIDR"]
