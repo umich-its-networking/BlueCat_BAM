@@ -86,11 +86,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         raw_in=False,
         timeout=None,
         max_retries=None,
+        verify=True,
     ):
         """login to BlueCat server API, get token, set header"""
         self.username = username
         self.password = password
         self.timeout = timeout
+        self.verify = verify
         self.raw = bool(raw)
         self.parentviewcache = {}  # zoneid: viewid
         logging.info("raw: %s", self.raw)
@@ -201,6 +203,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             data=data,
             params=kwargs,
             timeout=self.timeout,
+            verify=self.verify,
         )
         logging.info(vars(response.request))
         logging.info("response: %s", response.text)

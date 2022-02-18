@@ -3,6 +3,12 @@
 """
 prep_network_for_wifi_swap.py [--offset nn] [--free nn] < list-of-networkIP
 
+Add lease time 10 min if not already setup
+
+Check for dhcp options, warn and skip if not set
+
+Save current data to files
+
 In the range needed for new devices,
 Replace DHCP Reserved records with DHCP Allocated, and recreate any HostRecord's
 Leave any DHCP Reserved that are outside that range,
@@ -24,7 +30,7 @@ __version__ = "0.1"
 
 
 def get_ip_dict(conn, networkid):
-    """get dict of DHCP_ALLOCATED and DHCP_RESERVED IP's in network"""
+    """get dict of IP's in network"""
     ip_list = conn.get_ip_list(
         networkid
     )  # , states=["DHCP_ALLOCATED", "DHCP_RESERVED"])
@@ -32,21 +38,6 @@ def get_ip_dict(conn, networkid):
     if ip_list:
         ip_dict = conn.make_ip_dict(ip_list)
     return ip_dict
-
-
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + field + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
 
 
 def main():
@@ -93,11 +84,92 @@ def main():
         obj_list = conn.get_obj_list(args.object_ident, configuration_id, "")
         logger.info("obj_list: %s", obj_list)
 
+        error_list = []
         for network_obj in obj_list:
-            prep_one_network(conn, network_obj, offset, free)
+            network_text="%s\t%s\t%s" % (network_obj['type'], network_obj['name'],network_obj['properties']['CIDR'])
+            # print(network_text)
+            check_options(conn, network_obj, network_text, error_list)
+            add_lease_time(conn, network_obj, network_text, error_list)
+            prep_one_network(conn, network_obj, network_text, offset, free, error_list)
+        if error_list:
+            print("========== ERRORS ==========")
+            for line in error_list:
+                print(line)
 
 
-def prep_one_network(conn, network_obj, offset, free):
+def check_options(conn, network_obj, network_text, error_list):
+    '''verify that vendor-class-identifier and vendor-encapsulated-options are set'''
+    optionlist = ["vendor-class-identifier","vendor-encapsulated-options"]
+    network_id = network_obj['id']
+    options = conn.do(
+        "getDeploymentOptions", entityId=network_id, optionTypes="DHCPV4ClientOption", serverId=0
+    )
+    found={}
+    for option in options:
+        name = option.get("name")
+        # print("name",name)
+        if name in optionlist:
+            found[name]=option['value']
+            # print("value",option['value'])
+    if found.get("vendor-class-identifier") != "ArubaAP":
+        errormsg="ERROR - network %s vendor-class-identifier not set" % (network_text)
+        error_list.append(errormsg)
+        print(errormsg)
+    if not(found.get("vendor-encapsulated-options") and len(found["vendor-encapsulated-options"]) == 11):
+        errormsg="ERROR - network %s vendor-encapsulated-options not correct" % (network_text)
+        error_list.append(errormsg)
+        print(errormsg)
+
+
+def add_lease_time(conn, network_obj, network_text, error_list):
+    """add lease time 10 min if not already set"""
+    logger = logging.getLogger()
+    prop={}
+    leasetime="600"
+    dhcpserver_id=0
+    errormsg=""
+    set_lease_time=False
+    network_id = network_obj.get("id")
+
+    for opt_name in ["default-lease-time", "max-lease-time", "min-lease-time"]:
+        option = conn.do(
+            "getDHCPServiceDeploymentOption",
+            entityId=network_id,
+            name=opt_name,
+            serverId=dhcpserver_id,
+        )
+        logger.info(option)
+        if option.get("id"):
+            value = option["value"]
+            if value != leasetime:
+                errormsg = "ERROR - network %s option %s already set to %s" % (network_text, opt_name, value)
+                error_list.append(errormsg)
+                print(errormsg)
+        else:
+            option_id = conn.do(
+                "addDHCPServiceDeploymentOption",
+                entityId=network_id,
+                name=opt_name,
+                value=leasetime,
+                properties=prop,
+            )
+            logger.info(option_id)
+            set_lease_time=True
+
+            option = conn.do(
+                "getDHCPServiceDeploymentOption",
+                entityId=network_id,
+                name=opt_name,
+                serverId=dhcpserver_id,
+            )
+            if option["value"] != leasetime:
+                errormsg="ERROR - network %s failed to set lease time, got %s" % (network_text,option["value"])
+                error_list.append(errormsg)
+    if not errormsg:
+        if set_lease_time:
+            print("network %s set lease time" % (network_text))
+
+def prep_one_network(conn, network_obj, network_text, offset, free, error_list):
     """prep one network"""
     networkid = network_obj["id"]
 
@@ -138,6 +210,14 @@ def prep_one_network(conn, network_obj, offset, free):
     else:
         start = network_ip + offset
     end = start + range_size - 1
+    if end >= ipaddress.IPv4Network(cidr).broadcast_address:
+        start = network_ip + 5
+        end = start + range_size - 1
+        if end >= ipaddress.IPv4Network(cidr).broadcast_address:
+            errormsg = "ERROR - network %s failed to create range size %s, too big" % (network_text, range_size)
+            error_list.append(errormsg)
+            print(errormsg)
+            return
 
     # expand or add or replace ranges from offset to range_end
     # for now, only allow one range
@@ -253,11 +333,12 @@ def convert_dhcp_reserved_to_allocated(conn, ip_dict, start, end):
 
 def create_host_records(hostrec_list, hostrec_view_dict, conn):
     """(re)create host records"""
+    logger = logging.getLogger()
     hostname_list = []
     for host_obj in hostrec_list:
         host_id = host_obj["id"]
         view_id = hostrec_view_dict[host_id]
-        result = conn.do(
+        rec_id = conn.do(
             "addHostRecord",
             absoluteName=host_obj["properties"]["absoluteName"],
             addresses=host_obj["properties"]["addresses"],
@@ -265,21 +346,16 @@ def create_host_records(hostrec_list, hostrec_view_dict, conn):
             ttl=host_obj["properties"].get("ttl", "-1"),
             viewId=view_id,
         )
-        if result:
-            print("addHostRecord result", result)
+        logger.info("addHostRecord id %s", rec_id)
         # or assignIP4Address  ??
         hostname_list.append(host_obj["properties"]["absoluteName"])
     hostname_out = " ".join(hostname_list)
     if hostname_list:
-        print(hostname_out)
+        print("recreated",hostname_out)
 
 
 def print_ip(ip):
     """print ip address object"""
-    name = getfield(ip, "name")
-    address = getprop(ip, "address")
-    mac = getprop(ip, "macAddress")
-    print(address, name, mac)
     print(
         "address %s,\tname %s,\tmacAddress %s"
         % (

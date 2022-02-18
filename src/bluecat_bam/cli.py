@@ -117,6 +117,7 @@ def main():
         + "caution: level DEBUG(10) or lower will show the password in the login call",
         default=os.getenv("BLUECAT_LOGGING", "WARNING"),
     )
+    config.add_argument("--verify", default=True, help="verify SSL Cert, default True")
     config.add_argument(
         "command", help="BlueCat REST API command, for example: getEntityById"
     )
@@ -167,7 +168,7 @@ def main():
 
     # call MAIN
     with BAM(
-        args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in
+        args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in, verify=args.verify
     ) as conn:
         entity = conn.do(args.command, **params)
         try:
