@@ -71,9 +71,7 @@ def main():
             ip = data["ip"]
             if ip not in net_list:
                 if format_list:
-                    for name in format_list:
-                        print(data[name], end=" ")
-                    print()
+                    print(" ".join([data[name] for name in format_list]))
                 else:
                     print(
                         "IP4Network", data["name"], ip, "shared_network", data["share"]
