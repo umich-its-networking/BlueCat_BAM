@@ -168,7 +168,12 @@ def main():
 
     # call MAIN
     with BAM(
-        args.server, args.username, args.password, raw=args.raw, raw_in=args.raw_in, verify=args.verify
+        args.server,
+        args.username,
+        args.password,
+        raw=args.raw,
+        raw_in=args.raw_in,
+        verify=args.verify,
     ) as conn:
         entity = conn.do(args.command, **params)
         try:
