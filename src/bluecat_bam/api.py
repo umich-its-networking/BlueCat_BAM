@@ -705,8 +705,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             print("ERROR - server or interface not found for", server_name)
         return server_obj, interface_obj
 
-    def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
-        """get list of entities with given fqdn and type"""
+    def get_zone(self, domain_name, view_id):
+        """get closest zone for domain_name"""
         logger = logging.getLogger()
         domain_label_list = domain_name.split(".")
         logger.info(domain_label_list)
@@ -717,7 +717,9 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         parent_id = view_id
 
         while True:
-            logger.info("%s %s %s", zone_start, zone_end, search_domain)
+            logger.info(
+                "start: %s, end: %s, search: %s", zone_start, zone_end, search_domain
+            )
             zone = self.do(
                 "getEntityByName",
                 method="get",
@@ -731,9 +733,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                     search_domain = ".".join(domain_label_list[zone_start:zone_end])
                     continue
                 break
+            found_zone = zone
             parent_id = zone.get("id")
             current_domain = ".".join(domain_label_list[zone_start:])
-            logger.info("%s %s", zone, current_domain)
+            logger.info("current_domain: %s, zone: %s", current_domain, zone)
             if zone_start != 0:
                 zone_end = zone_start
                 zone_start -= 1
@@ -741,20 +744,28 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             else:
                 search_domain = ""
                 break
+        remainder = ".".join(domain_label_list[0:zone_end])
+        logger.info("remainder: %s", remainder)
+        return found_zone, remainder
 
+    def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
+        """get list of entities with given fqdn and type"""
+        logger = logging.getLogger()
+        zone, remainder = self.get_zone(domain_name, view_id)
         if record_type.lower() == "zone":
             entities = [zone]
         else:
             entities = self.do(
                 "getEntitiesByNameUsingOptions",
                 method="get",
-                parentId=parent_id,
-                name=search_domain,
+                parentId=zone["id"],
+                name=remainder,
                 type=record_type,
                 options="ignoreCase=true",
                 start=0,
                 count=1000,
             )
+        logger.info("entities: %s", entities)
         return entities
 
     def delete_ip_obj(self, ip_obj):
