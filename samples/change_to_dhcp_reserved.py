@@ -18,30 +18,10 @@ __progname__ = "change_to_dhcp_reserved"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_ip_by_state(networkid, conn, state):
     """get list of IP objects matching state"""
     logger = logging.getLogger()
-    ip_list = get_bam_api_list(
+    ip_list = conn.get_bam_api_list(
         conn,
         "getEntities",
         parentId=networkid,
