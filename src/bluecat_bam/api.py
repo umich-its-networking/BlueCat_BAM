@@ -517,6 +517,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                     print("not found", line)
         return obj_list
 
+    # pylint: disable=R0912
     def get_obj(self, object_ident, containerId, rangetype, warn=True):
         """get an object, given an id, IP, CIDR, or range,
         return object and type matched"""
@@ -525,27 +526,42 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         id_pattern = re.compile(r"\d+$")
         id_match = id_pattern.match(object_ident)
         logger.info("id Match result: %s", id_match)
+        pat = (
+            r"^((?:\d{1,3}\.){3}\d{1,3})(?:(\/)(\d{1,2})|-((?:\d{1,3}\.){3}\d{1,3})|)$"
+        )
         if id_match:  # an id
             obj = self.do("getEntityById", id=object_ident)
             obj_type = "id"
         else:  # not an id
-            ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
+            # ip, cidr, or range:
+            # ^((?:\d{1,3}\.){3}\d{1,3})(?:(\/)(\d{1,2})|-((?:\d{1,3}\.){3}\d{1,3})|)$
+            # match groups: ip, slash, prefix, range_end
+            # old pattern: ((?:\d{1,3}\.){3}\d{1,3})($|[^\d])
+            ip_pattern = re.compile(pat)
             ip_match = ip_pattern.match(object_ident)
+
             logger.info("IP Match result: '%s'", ip_match)
-            if ip_match:  # an IP
-                obj_type = "IP4Address"
-                if "/" in object_ident:
-                    obj_type = "IP4Network"
+            if ip_match:
+                if ip_match.group(3):
+                    if ip_match.group(3) == "-":
+                        obj_type = "DHCP4Range"
+                    elif ip_match.group(3) == "/":
+                        obj_type = "CIDR"  # Block or Network
+                    else:
+                        print("error in matching")
+                else:
+                    obj_type = "IP4Address"
                 logger.info(
-                    "IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2)
+                    "IP Match: '%s' divider: '%s' prefix: '%s' range_end: '%s'",
+                    ip_match.group(1),
+                    ip_match.group(2),
+                    ip_match.group(3),
+                    ip_match.group(4),
                 )
                 object_ident = ip_match.group(1)
-                if not rangetype:
-                    if ip_match.group(2) == "-":
-                        rangetype = "DHCP4Range"
-                        obj_type = "DHCP4Range"
-                    # "/" matches either IP4Block or IP4Network
-                if rangetype == "IP4Address":
+                if rangetype == "IP4Address" or (
+                    rangetype is None and obj_type == "IP4Address"
+                ):
                     obj = self.do(
                         "getIP4Address",
                         method="get",
@@ -553,6 +569,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                         address=object_ident,
                     )
                 else:
+                    # get block, network, or dhcp range by ip
                     obj = self.get_range(object_ident, containerId, rangetype)
                     if obj and obj["id"]:
                         obj_type = obj["type"]
@@ -856,6 +873,36 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         }
         return ip_dict
 
+    def get_shared_network_by_name(self, name):
+        """get shared network by name, in configuration"""
+        # search for name
+        obj_list = self.get_bam_api_list(
+            "searchByObjectTypes",
+            keyword=name,
+            types="Tag,TagGroup",
+        )
+        print("not complete, filter for match")
+        return obj_list
+
+    def find_parent_of_type(self, obj_id, obj_type):
+        """search up tree for parent with the given type,
+        like finding the group for a tag,
+        or the configuration for a network,
+        or the view for a zone or record,
+        returns parent object"""
+        logger = logging.getLogger()
+        myid = obj_id
+        mytype = None
+        parent_obj = None  # make it in this scope
+        while mytype != obj_type and myid != 0:
+            parent_obj = self.do("getParent", entityId=myid)
+            mytype = parent_obj["type"]
+            myid = parent_obj["id"]
+            logger.info("id: %s, name: %s, type: %s", myid, parent_obj["name"], mytype)
+        if myid == 0:
+            return None
+        return parent_obj
+
 
 class DhcpRangeList(list):  # pylint: disable=R0902
     """make a dhcp range list object, with function to check if in range,
@@ -887,8 +934,6 @@ class DhcpRangeList(list):  # pylint: disable=R0902
             # no range_size, put start after end so it never matches
             self.start = self.broadcast_ip + 1
             self.end = self.broadcast_ip
-
-    # __enter__ from our parent class returns the list object for us
 
     def in_range(self, ip):
         """check if given IP is in any of the DHCP raanges"""
