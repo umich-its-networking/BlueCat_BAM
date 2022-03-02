@@ -873,16 +873,32 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         }
         return ip_dict
 
-    def get_shared_network_by_name(self, name):
-        """get shared network by name, in configuration"""
+    def get_shared_network_tag_by_name(self, name, configuration_id):
+        """get shared network tag by name, in configuration"""
+        logger = logging.getLogger()
+        cfg_obj = self.do("getEntityById", id=configuration_id)
+        shared_net_group_id = int(cfg_obj["properties"]["sharedNetwork"])
         # search for name
         obj_list = self.get_bam_api_list(
             "searchByObjectTypes",
             keyword=name,
             types="Tag,TagGroup",
         )
-        print("not complete, filter for match")
-        return obj_list
+        found = None  # define in this scope
+        for obj in obj_list:
+            # verify exact name match (not partial)
+            if obj["name"] == name:
+                # verify that it is a shared_network tag for this configuration
+                group = self.find_parent_of_type(obj["id"], "TagGroup")
+                logger.info(
+                    "compare %s to %s",
+                    json.dumps(group["id"]),
+                    json.dumps(shared_net_group_id),
+                )
+                if group["id"] == shared_net_group_id:
+                    found = obj
+                    logger.info("found %s", found)
+        return found
 
     def find_parent_of_type(self, obj_id, obj_type):
         """search up tree for parent with the given type,

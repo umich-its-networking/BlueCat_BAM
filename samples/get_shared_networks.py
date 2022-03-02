@@ -25,9 +25,6 @@ def main():
         "ident", help="CIDR or IP address of the network, or the shared network name"
     )
     config.add_argument(
-        "--group", "-g", help="shared network group name", default="Shared Networks"
-    )
-    config.add_argument(
         "--list",
         nargs="+",
         default=[],
@@ -42,7 +39,6 @@ def main():
 
     configuration_name = args.configuration
     ident = args.ident
-    group = args.group
     format_list = args.list
 
     for name in format_list:
@@ -60,12 +56,10 @@ def main():
                 # remove one line ending
                 line = re.sub(r"(?:\r\n|\n)$", "", line, count=1)
                 get_shared_net(
-                    conn, line, configuration_id, configuration_name, group, data_list
+                    conn, line, configuration_id, configuration_name, data_list
                 )
         else:
-            get_shared_net(
-                conn, ident, configuration_id, configuration_name, group, data_list
-            )
+            get_shared_net(conn, ident, configuration_id, configuration_name, data_list)
 
         for data in data_list:
             ip = data["ip"]
@@ -79,11 +73,11 @@ def main():
                 net_list.append(ip)
 
 
-def get_shared_net(conn, ident, configuration_id, configuration_name, group, data_list):
-    """get one shared network"""
+def get_shared_net(conn, ident, configuration_id, configuration_name, data_list):
+    """get one shared network, add to data_list"""
     logger = logging.getLogger()
     obj, obj_type = conn.get_obj(ident, configuration_id, "IP4Network", warn=False)
-    logger.info("obj %s, type %s", obj, obj_type)
+    logger.info("get_shared_net obj %s, type %s", obj, obj_type)
     shared_name = None
     if obj_type:
         if obj:
@@ -95,33 +89,17 @@ def get_shared_net(conn, ident, configuration_id, configuration_name, group, dat
         shared_name = ident
 
     if shared_name:
-        # get shared network group
-        group_obj = conn.do("getEntityByName", parentId=0, type="TagGroup", name=group)
-        group_id = group_obj["id"]
-        if group_id == 0:
-            print(
-                "ERROR - shared network group",
-                group,
-                "in Configuration",
-                configuration_name,
-                "not found",
-            )
-            return
-        # get tag id
-        tag_obj = conn.do(
-            "getEntityByName", parentId=group_id, name=shared_name, type="Tag"
-        )
-        if not tag_obj or tag_obj["id"] == 0:
+        tag_obj = conn.get_shared_network_tag_by_name(shared_name, configuration_id)
+        logger.info("new api tag %s", tag_obj)
+        if not tag_obj:
             print(
                 "ERROR - tag",
                 shared_name,
-                "in group",
-                group,
                 "in Configuration",
                 configuration_name,
                 "not found",
             )
-        logger.info("tag %s", tag_obj)
+        logger.info("get_shared_net tag %s", tag_obj)
 
         # get shared networks
         network_obj_list = conn.do(
