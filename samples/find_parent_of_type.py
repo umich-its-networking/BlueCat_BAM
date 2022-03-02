@@ -10,6 +10,7 @@ import logging
 
 import bluecat_bam
 
+
 def main():
     """find parent object of specified type"""
     config = bluecat_bam.BAM.argparsecommon("find parent object of specified type")
@@ -29,6 +30,7 @@ def main():
         parent_obj = conn.find_parent_of_type(start_id, object_type)
 
         print(json.dumps(parent_obj))
+
 
 if __name__ == "__main__":
     main()
