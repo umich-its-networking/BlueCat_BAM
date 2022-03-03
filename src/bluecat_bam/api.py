@@ -543,12 +543,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             logger.info("IP Match result: '%s'", ip_match)
             if ip_match:
                 if ip_match.group(3):
-                    if ip_match.group(3) == "-":
+                    if ip_match.group(2) == "-":
                         obj_type = "DHCP4Range"
-                    elif ip_match.group(3) == "/":
+                    elif ip_match.group(2) == "/":
                         obj_type = "CIDR"  # Block or Network
                     else:
-                        print("error in matching")
+                        print("error in matching", ip_match.groups())
                 else:
                     obj_type = "IP4Address"
                 logger.info(
