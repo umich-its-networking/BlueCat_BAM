@@ -9,7 +9,7 @@ Add lease time 10 min if not already setup
 Check for dhcp options, warn and skip if not set
 
 Step2:
-Save current data to files
+Print current data
 
 Outside the range needed for new devices,
 convert DHCP allocated to DHCP Reserved.
