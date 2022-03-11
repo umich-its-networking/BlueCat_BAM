@@ -5,6 +5,8 @@
 # to be python2/3 compatible:
 from __future__ import print_function
 
+# from builtins import str
+
 import os
 import sys
 import json
@@ -17,7 +19,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
 
-class BAMu(object):
+class BAM:  # pylint: disable=R0902
     """BAM API using urllib"""
 
     def __init__(
@@ -55,27 +57,41 @@ class BAMu(object):
     def __exit__(self, *args):
         self.logout()
 
-    def make_request(url, headers=None, data=None, method=None, params=None):
-        """request similar to requests"""
-        print("url %s params %s" % (url, params))
+    @staticmethod
+    def request(method, url, data=None, params=None, headers=None, timeout=10):
+        """try to mimic the requests module"""
+        logger = logging.getLogger()
+        logger.info("method %s url %s params %s", method, url, params)
+        if headers is None:
+            headers = {}
         if params:
             params = urllib.parse.urlencode(params)
             url = "%s%s" % (url, params)
-        request = Request(url, headers=headers or {}, data=data, method=method)
+        if data:
+            data = data.encode("utf-8")  # converts utf-8 to bytes
+        request = Request(url, headers=headers, data=data, method=method)
         try:
             # bandit blacklists urlopen because it can open files also
             # that is not a concern here
-            with urlopen(request, timeout=10) as response:  # nosec
+            with urlopen(request, timeout=timeout) as response:  # nosec
+                logger.debug(response.status)
+                result = response.read()
+                logger.debug(result)
                 if response.status != 200:
                     print(response.status)
                     return response.status
-                return json.loads(response.read())
+                if len(result) > 0:
+                    return json.loads(result)
+                return None
         except HTTPError as error:
             print(error.status, error.reason)
+            raise HTTPError from error
         except URLError as error:
             print(error.reason)
-        except TimeoutError:
+            raise URLError from error
+        except TimeoutError as error:
             print("Request timed out")
+            raise TimeoutError from error
         return None
 
     @staticmethod
@@ -96,14 +112,16 @@ class BAMu(object):
 
     def login(self):
         """login, get token"""
-        print("mainurl in login %s" % (self.mainurl))
+        logging.info("mainurl in login %s", self.mainurl)
         url = self.mainurl + "login?"
-        print("url %s" % (url))
-        response = self.make_request(
+        logging.info("url %s", url)
+        response = self.request(
+            "GET",
             url,
             params={"username": self.username, "password": self.password},
         )
-        self.token = str(response.json())
+        logging.info("response %s", response)
+        self.token = str(response)
         self.token = self.token.split()[2] + " " + self.token.split()[3]
         self.token_header = {
             "Authorization": self.token,
@@ -112,7 +130,7 @@ class BAMu(object):
 
     def logout(self):
         """log out of BlueCat server, return nothing"""
-        self.get(self.mainurl + "logout?", headers=self.token_header)
+        self.request("GET", self.mainurl + "logout?", headers=self.token_header)
 
     def do(self, command, method=None, data=None, **kwargs):
         # pylint: disable=invalid-name,R0912
@@ -152,27 +170,30 @@ class BAMu(object):
         response = self.request(
             method,
             self.mainurl + command + "?",
-            # params={"properties": properties, kwargs},
             headers=self.token_header,
             data=data,
             params=kwargs,
             timeout=self.timeout,
-            verify=self.verify,
+            # verify=self.verify,
         )
-        logging.info(vars(response.request))
-        logging.info("response: %s", response.text)
-        logging.debug("headers: %s", response.headers)
-        logging.debug("len: %s", response.headers.get("Content-Length"))
+        # logging.info(vars(response.request))
+        logging.info("api response %s", response)
+        # logging.debug(response.status)
+        # logging.info("response: %s", response.read())
+        # logging.debug("headers: %s", response.headers)
+        # logging.debug("len: %s", response.headers.get("Content-Length"))
         # print("status_code: %s" % response.status_code)
-        if response.status_code != 200:
-            print(response.text, file=sys.stderr)
-        response.raise_for_status()
+        # if response.status_code != 200:
+        #    print(response.text, file=sys.stderr)
+        # response.raise_for_status()
         # check type of response
         logging.info(response)
-        if response.headers.get("Content-Length") == "0":
+        # if response.headers.get("Content-Length") == "0":
+        if isinstance(response, str) and len(response) == 0:
             obj = None  # void (null) response
         else:
-            obj = response.json()
+            # obj = response.json()
+            obj = response
         if not self.raw:
             obj = self.convert_response(obj)
         return obj
@@ -182,7 +203,7 @@ class BAMu(object):
     def convert_dict_in_str_to_dict(data):
         """data, properties, and overrides can be dict, but passed as json string,
         especially from cli"""
-        if data and isinstance(data, basestring) and data[0] == "{":
+        if data and isinstance(data, str) and data[0] == "{":
             try:
                 data = json.loads(data)
             except ValueError:
@@ -197,7 +218,7 @@ class BAMu(object):
         logging.debug(data)
         # convert string to dict if needed
         if data:
-            if isinstance(data, basestring):
+            if isinstance(data, str):
                 data = json.loads(data)
             newdata = {}
             # convert inside dict
@@ -224,7 +245,7 @@ class BAMu(object):
         """check types of response and convert if needed"""
         if obj is None:
             logging.info("response is null")
-        elif isinstance(obj, basestring):
+        elif isinstance(obj, str):
             logging.info("response is string")
             obj = self.convert_str_to_dict(obj)
         elif isinstance(obj, dict):
@@ -250,7 +271,7 @@ class BAMu(object):
     @staticmethod
     def convert_str_to_dict(value):
         """convert string to dict"""
-        if isinstance(value, basestring) and "|" in value:
+        if isinstance(value, str) and "|" in value:
             value = dict(
                 # using a python "generator", not a "comprehension"
                 item.split("=", 1)
@@ -333,7 +354,6 @@ def main():
     # test data
     mac_address = "02-00-02-00-02-00"  # in the user defined range
 
-
     config = argparse.ArgumentParser(description="add next dhcp reserved")
     config.add_argument(
         "--server",
@@ -370,13 +390,17 @@ def main():
     )
     args = config.parse_args()
 
+    add_update_get_delete(args, mac_address)
+
+
+def add_update_get_delete(args, mac_address):
+    """add_update_get_delete demo code"""
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-
-    #with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
-    with BAMu(args.server, args.username, args.password) as conn:
+    # with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
+    with BAM(args.server, args.username, args.password) as conn:
 
         configuration_obj = conn.do(
             "getEntityByName",
@@ -390,7 +414,10 @@ def main():
 
         print("check if mac address exists, should get id=0 if not")
         oldmac = conn.do(
-            "getMACAddress", method="get", configurationId=config_id, macAddress=mac_address
+            "getMACAddress",
+            method="get",
+            configurationId=config_id,
+            macAddress=mac_address,
         )
         print("old mac is: ", json.dumps(oldmac))
         mac_id = oldmac["id"]
@@ -413,7 +440,10 @@ def main():
 
         print("get mac address just added")
         entity = conn.do(
-            "getMACAddress", method="get", configurationId=config_id, macAddress=mac_address
+            "getMACAddress",
+            method="get",
+            configurationId=config_id,
+            macAddress=mac_address,
         )
         print(json.dumps(entity))
         print()
@@ -424,13 +454,16 @@ def main():
         print()
 
         print("update the mac address in bluecat, expect null response")
-        resp = conn.do("update", method="put", body=entity)
+        resp = conn.do("update", method="PUT", body=entity)
         print(json.dumps(resp))
         print()
 
         print("get mac address from bluecat")
         entity = conn.do(
-            "getMACAddress", method="get", configurationId=config_id, macAddress=mac_address
+            "getMACAddress",
+            method="get",
+            configurationId=config_id,
+            macAddress=mac_address,
         )
         print(json.dumps(entity))
         print()
@@ -442,7 +475,10 @@ def main():
 
         print("check if mac address exists, should get id=0")
         entity = conn.do(
-            "getMACAddress", method="get", configurationId=config_id, macAddress=mac_address
+            "getMACAddress",
+            method="get",
+            configurationId=config_id,
+            macAddress=mac_address,
         )
         print(json.dumps(entity))
         print()
