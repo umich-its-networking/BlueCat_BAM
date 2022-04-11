@@ -594,10 +594,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         obj = self.do(
             "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
         )
-        obj_id = obj["id"]
-        cidr = obj["properties"].get("CIDR")
-        start = obj["properties"].get("start")
-
+        if obj:
+            obj_id = obj.get("id")
+            if obj_id:
+                cidr = obj["properties"].get("CIDR")
+                start = obj["properties"].get("start")
         logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
         if obj_id == 0:
             obj = None
