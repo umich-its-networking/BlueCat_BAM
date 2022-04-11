@@ -80,10 +80,10 @@ def get_shared_net(conn, ident, configuration_id, configuration_name, data_list)
     logger.info("get_shared_net obj %s, type %s", obj, obj_type)
     shared_name = None
     if obj_type:
-        if obj:
+        if obj and obj['id'] != 0:
             shared_name = obj["properties"].get("sharedNetwork")
         else:
-            print("ERROR - not found:", ident)
+            print("ERROR - not found:", ident, file=sys.stderr)
             return
     else:
         shared_name = ident
