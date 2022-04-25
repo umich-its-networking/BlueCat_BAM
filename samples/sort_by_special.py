@@ -101,9 +101,16 @@ def sort_by_special(lines, regex, sort_type):  # pylint: disable=R0912
                 print(line, file=sys.stderr)
                 continue
         elif sort_type == "mac":
+            # mac address formats:
+            # 01:23:45:67:89:ab
+            # 1:23:4:67:89:ab
+            # 11-22-33-44-55-66
+            # 0123456789ab
+            # ^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})
             s = re.search(
                 r"""(^|[^:0-9a-fA-F])((?:[0-9a-fA-F]{1,2}[-:.]){5}
-                [0-9a-fA-F]{1,2}|[0-9a-fA-F]{12})($|[^:0-9a-fA-F-])""",
+                [0-9a-fA-F]{1,2}|[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}
+                [.]){2}[0-9a-fA-F]{4})($|[^:0-9a-fA-F-])""",
                 line,
                 re.X,
             )
