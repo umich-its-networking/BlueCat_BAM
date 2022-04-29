@@ -110,6 +110,14 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             url_prefix = self.mainurl.split("://", 1)[0] + "://"
             self.mount(url_prefix, adapter)
         self.login()
+        # set up compiled patterns once at start for later .match
+        ip_pat = (
+            r"^(?P<start>(?:\d{1,3}\.){3}\d{1,3})(?:\/(?P<prefix>\d{1,2})|-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$"
+        )
+        self.ip_pattern = re.compile(ip_pat)
+        self.id_pattern = re.compile(r"\d+$")
+        mac_pat = r"^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})"
+        self.mac_pattern = re.compile(mac_pat)
 
     # __enter__ from our parent class returns the Session object for us
 
@@ -473,126 +481,152 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             listall.extend(listone)
         return listall
 
-    def get_id_list(self, object_ident, containerId, rangetype):
+    def get_id_list(self, object_ident, containerId, object_type):
         """get object id, or a list of objects from a file"""
-        obj_list = self.get_obj_list(object_ident, containerId, rangetype)
+        obj_list = self.get_obj_list(object_ident, containerId, object_type)
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
-    def get_obj_list(self, object_ident, containerId, rangetype):
+    def get_obj_list(self, object_ident, containerId, object_type):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
+        logger.info("get_obj_list object_ident: %s, containerId: %s, object_type: %s",object_ident, containerId, json.dumps(object_type))
         obj_list = []
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                obj_list = self.get_obj_lines(f, containerId, rangetype)
+                obj_list = self.get_obj_lines(f, containerId, object_type)
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
-        obj, obj_type = self.get_obj(object_ident, containerId, rangetype, warn=False)
+        obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False)
         if obj and obj.get("id"):
             obj_list = [obj]
         elif obj_type:
-            print("not found", object_ident)
+            print("not found", object_ident, obj_type)
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    obj_list = self.get_obj_lines(f, containerId, rangetype)
+                    obj_list = self.get_obj_lines(f, containerId, object_type)
                 logger.info(obj_list)
                 return obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
         return obj_list
 
-    def get_obj_lines(self, fd, containerId, rangetype):
+    def get_obj_lines(self, fd, containerId, object_type):
         """read lines, get obj, return obj list"""
         obj_list = []
         for line in fd:
             if line.strip() != "":
-                obj, _ = self.get_obj(line.strip(), containerId, rangetype)
+                obj, _ = self.get_obj(line.strip(), containerId, object_type)
                 if obj and obj["id"]:
                     obj_list.append(obj)
                 else:
                     print("not found", line)
         return obj_list
 
+
+    def match_type(self, object_ident):
+        '''uses pattern matching, finds type as
+        id, MACAddress, IP4Address, CIDR, IP4Range, or None
+        where CIDR could be IP4Block or IP4Network,
+        and None could be a filename or other, or an error,
+        id returns ("id", None, None)
+        MAC returns ("MACAddress", None, None)
+        IP returns ("IP4Address", ip, None)
+        CIDR returns ("CIDR", start, prefix)
+        IP4Range returns ("IP4Range", start, end)
+        None return (None, None, None)
+        '''
+        logger = logging.getLogger()
+        part1=None
+        part2=None
+        id_match = self.id_pattern.match(object_ident)
+        if id_match:
+            obj_type = "id"
+        else:
+            mac_match = self.mac_pattern.match(object_ident)
+            if mac_match:
+                obj_type = "MACAddress"
+            else:
+                ip_match = self.ip_pattern.match(object_ident)
+                if ip_match.group('start'):
+                    part1=ip_match.group('start')
+                    if ip_match.group('prefix'):
+                        obj_type = "CIDR"  # IP4Block or IP4Network
+                        part2=ip_match.group('prefix')
+                    elif ip_match.group('end'):
+                        obj_type = "DHCP4Range"
+                        part2=ip_match.group('end')
+                    else:
+                        obj_type = "IP4Address"
+                else:
+                    obj_type=None
+        logger.info("matched type: %s, part1 %s, part2 %s",obj_type, part1, part2)
+        return obj_type,part1,part2
+
     # pylint: disable=R0912
-    def get_obj(self, object_ident, containerId, rangetype, warn=True):
+    def get_obj(self, object_ident, containerId, object_type, warn=True):
         """get an object, given an id, IP, CIDR, or range,
         return object and type matched"""
         logger = logging.getLogger()
-        obj_type = None
-        id_pattern = re.compile(r"\d+$")
-        id_match = id_pattern.match(object_ident)
+        logger.info("get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
+            object_ident, containerId, json.dumps(object_type), warn)
+        obj_type, part1, part2 = self.match_type(object_ident)
+        if object_type is None:
+            object_type = ""  # standardize the value
+        obj=None
+        id_match = self.id_pattern.match(object_ident)
         logger.info("id Match result: %s", id_match)
-        pat = (
-            r"^((?:\d{1,3}\.){3}\d{1,3})(?:(\/)(\d{1,2})|-((?:\d{1,3}\.){3}\d{1,3})|)$"
-        )
-        if id_match:  # an id
+        mac_match = self.mac_pattern.match(object_ident)
+        logger.info("mac_match: %s", mac_match)
+        if obj_type == "id":
             obj = self.do("getEntityById", id=object_ident)
-            obj_type = "id"
-        else:  # not an id
-            # ip, cidr, or range:
-            # ^((?:\d{1,3}\.){3}\d{1,3})(?:(\/)(\d{1,2})|-((?:\d{1,3}\.){3}\d{1,3})|)$
-            # match groups: ip, slash, prefix, range_end
-            # old pattern: ((?:\d{1,3}\.){3}\d{1,3})($|[^\d])
-            ip_pattern = re.compile(pat)
-            ip_match = ip_pattern.match(object_ident)
-
-            logger.info("IP Match result: '%s'", ip_match)
-            if ip_match:
-                if ip_match.group(3):
-                    if ip_match.group(2) == "-":
-                        obj_type = "DHCP4Range"
-                    elif ip_match.group(2) == "/":
-                        obj_type = "CIDR"  # Block or Network
-                    else:
-                        print("error in matching", ip_match.groups())
-                else:
-                    obj_type = "IP4Address"
-                logger.info(
-                    "IP Match: '%s' divider: '%s' prefix: '%s' range_end: '%s'",
-                    ip_match.group(1),
-                    ip_match.group(2),
-                    ip_match.group(3),
-                    ip_match.group(4),
-                )
-                object_ident = ip_match.group(1)
-                if rangetype == "IP4Address" or (
-                    rangetype is None and obj_type == "IP4Address"
-                ):
-                    obj = self.do(
-                        "getIP4Address",
-                        method="get",
-                        containerId=containerId,
-                        address=object_ident,
-                    )
-                else:
-                    # get block, network, or dhcp range by ip
-                    obj = self.get_range(object_ident, containerId, rangetype)
-                    if obj and obj["id"]:
-                        obj_type = obj["type"]
-                    else:
-                        obj = None
-            else:  # not an IP or id
-                obj = None
+        elif obj_type == "MACAddress":
+            obj=self.do("getMACAddress", method="get", configurationId=containerId,
+                macAddress=object_ident)
+        elif obj_type=="IP4Address":
+            obj = self.do(
+                "getIP4Address",
+                method="get",
+                containerId=containerId,
+                address=object_ident,
+            )
+        elif obj_type=="CIDR":
+            obj = self.get_range(part1, containerId, object_type)
+            if obj and obj['id']:
+                obj_type = obj['type']
+            else:
+                print("cidr not found: %s" % (object_ident))
+        elif obj_type == "IP4Range":
+            obj = self.get_range(part1, containerId, object_type)
+            if obj and obj['id']:
+                obj_type = obj['type']
+            else:
+                print("IP4Range not found: %s" % (object_ident))
+        elif obj_type is None:
+            pass
+        else:
+            print("answer from match_type not recognized",obj_type, part1, part2)
         logger.info("get_obj returns %s of type %s", obj, obj_type)
         if not obj and warn:
             print("Warning - no object found for:", object_ident, file=sys.stderr)
         return obj, obj_type
 
-    def get_range(self, address, containerId, rangetype):
+    def get_range(self, address, containerId, object_type):
         """get range - block, network, or dhcp range - by IPv4 or IPv6"""
         logger = logging.getLogger()
         logger.info(
-            "get_range for address: %s, containerId %s, rangetype %s",
+            "get_range for address: %s, containerId %s, object_type %s",
             address,
             containerId,
-            rangetype,
+            json.dumps(object_type),
         )
+        if object_type is None:
+            object_type = ""  # standardize the value
         obj = self.do(
-            "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
+            "getIPRangedByIP", address=address, containerId=containerId, type=object_type
         )
         if obj:
             obj_id = obj.get("id")
@@ -612,7 +646,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 # bug in BlueCat - if Block and Network have the same CIDR,
                 # it should return the Network, but it returns the Block.
                 # So check for a matching Network.
-                if rangetype == "" and obj["type"] == "IP4Block":
+                if object_type == "" and obj["type"] == "IP4Block":
                     network_obj = self.do(
                         "getEntityByCIDR",
                         method="get",
