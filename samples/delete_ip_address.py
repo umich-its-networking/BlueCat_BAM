@@ -48,39 +48,55 @@ def main():
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
         # future accept list?
-        # input_list = conn.get_obj_list(args.object_ident, configuration_id, "")
-
-        ip_obj = conn.do(
-            "getIP4Address", method="get", containerId=configuration_id, address=ip
-        )
-        ip_id = ip_obj["id"]
-
-        if ip_id == 0:
-            print("IP Address not found: %s" % (ip))
-        else:
-            address = ip_obj["properties"]["address"]
-            state = ip_obj["properties"]["state"]
-            if not states or state in states:
-                if state == "DHCP_ALLOCATED":
-                    # BAM returns seconds with one decimal,
-                    # datetime needs 3, so add a couple zeros
-                    expiretime = datetime.datetime.fromisoformat(
-                        ip_obj["properties"]["expiryTime"] + "00"
-                    )
-                    if expiretime > datetime.datetime.now():
-                        print("warning - dhcp lease time still active", ip_obj)
-                result = conn.delete_ip_obj(ip_obj)
-                if result:
-                    print("delete resulted in", result)
-                # check if IP address still exists, should get id=0 if not
-                check_ip = conn.do("getEntityById", method="get", id=ip_id)
-                check_ip_id = check_ip["id"]
-                if check_ip_id == 0:
-                    print("Deleted IP %s %s" % (address, state))
-                else:
-                    print("ERROR - IP address failed to delete:", json.dumps(check_ip))
+        input_list = conn.get_obj_list(args.object_ident, configuration_id, "")
+        for ip_obj in input_list:
+            if ip_obj['type'] == "IP4Address":
+                del_ip(ip_obj, states, conn)
+            elif ip_obj['type'] == "IP4Network":
+                # get ips in net that match states
+                print('delete all ip in net')
+                ip_obj_list = conn.get_ip_list( ip_obj['id'], states=states)
+                for ip_obj in ip_obj_list:
+                    del_ip(ip_obj, states, conn)
+            elif ip_obj['type'] == "IP4Block":
+                # get netw in block
+                print('delete all ip in nets in block')
+                pass
+            elif ip_obj['type'] == "DHCP4Range":
+                # get ips in range
+                print('delete all ips in dhcp range')
+                pass
             else:
-                print("skipped due to state, IP %s, state %s" % (address, state))
+                print("object type not handled: %s" % (ip_obj['type']))
+
+
+
+def del_ip(ip_obj,states, conn ):
+    '''delete ip'''
+    ip_id = ip_obj["id"]
+    address = ip_obj["properties"]["address"]
+    state = ip_obj["properties"]["state"]
+    if not states or state in states:
+        if state == "DHCP_ALLOCATED":
+            # BAM returns seconds with one decimal,
+            # datetime needs 3, so add a couple zeros
+            expiretime = datetime.datetime.fromisoformat(
+                ip_obj["properties"]["expiryTime"] + "00"
+            )
+            if expiretime > datetime.datetime.now():
+                print("warning - dhcp lease time still active", ip_obj)
+        result = conn.delete_ip_obj(ip_obj)
+        if result:
+            print("delete resulted in", result)
+        # check if IP address still exists, should get id=0 if not
+        check_ip = conn.do("getEntityById", method="get", id=ip_id)
+        check_ip_id = check_ip["id"]
+        if check_ip_id == 0:
+            print("Deleted IP %s" % (ip_obj))
+        else:
+            print("ERROR - IP address failed to delete:", json.dumps(check_ip))
+    else:
+        print("skipped due to state, IP %s, state %s" % (address, state))
 
 
 if __name__ == "__main__":
