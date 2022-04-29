@@ -889,7 +889,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return self.getparentview(parent["id"])  # recursive
 
     def get_ip_list(self, networkid, states=None):
-        """get [filtered] list of IP entities"""
+        """returns [filtered] list of IP entities, given a network id
+        and optional list of states"""
         ip_list = self.get_bam_api_list(
             "getEntities",
             parentId=networkid,
