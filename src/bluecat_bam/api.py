@@ -577,10 +577,6 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         if object_type is None:
             object_type = ""  # standardize the value
         obj=None
-        id_match = self.id_pattern.match(object_ident)
-        logger.info("id Match result: %s", id_match)
-        mac_match = self.mac_pattern.match(object_ident)
-        logger.info("mac_match: %s", mac_match)
         if obj_type == "id":
             obj = self.do("getEntityById", id=object_ident)
         elif obj_type == "MACAddress":
@@ -595,8 +591,18 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             )
         elif obj_type=="CIDR":
             obj = self.get_range(part1, containerId, object_type)
+            obj_ip,obj_prefix = obj['properties']['CIDR'].split("/")
+            logger.info("CIDR obj_ip %s,obj_prefix %s,obj %s",obj_ip,obj_prefix,obj)
+            while obj_ip == part1 and obj_prefix > part2:
+                obj=self.do("getParent",entityId=obj['id'])
+                obj_ip,obj_prefix = obj['properties']['CIDR'].split("/")
+                logger.info("CIDR parent obj_ip %s,obj_prefix %s,obj %s",obj_ip,obj_prefix,obj)
             if obj and obj['id']:
                 obj_type = obj['type']
+                incidr=part1 + "/" + part2
+                if obj['properties']['CIDR'] != incidr:
+                    print("CIDR input %s did not match CIDR in %s" % (incidr,obj))
+                    obj=None
             else:
                 print("cidr not found: %s" % (object_ident))
         elif obj_type == "IP4Range":
