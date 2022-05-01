@@ -17,6 +17,7 @@ import datetime
 
 import bluecat_bam
 
+noverify=False
 
 def main():
     """delete_ip_address"""
@@ -35,6 +36,12 @@ def main():
         + " DHCP_FREE,DHCP_ALLOCATED,DHCP_RESERVED,STATIC"
         + " (default=all)",
     )
+    config.add_argument(
+        "--noverify",
+        help="do not verify that the IP was deleted"
+        + "this doubles the speed",
+        action="store_true"
+    )
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -43,6 +50,8 @@ def main():
 
     ip = args.object_ident
     states = args.states
+    global noverify
+    noverify  = args.noverify
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
@@ -54,21 +63,45 @@ def main():
                 del_ip(ip_obj, states, conn)
             elif ip_obj['type'] == "IP4Network":
                 # get ips in net that match states
-                print('delete all ip in net')
-                ip_obj_list = conn.get_ip_list( ip_obj['id'], states=states)
-                for ip_obj in ip_obj_list:
-                    del_ip(ip_obj, states, conn)
+                print('delete all ip in net %s' % (ip_obj))
+                del_ip_in_net(ip_obj, states, conn)
             elif ip_obj['type'] == "IP4Block":
                 # get netw in block
-                print('delete all ip in nets in block')
-                pass
+                print('delete all ip in nets in block %s' % (ip_obj))
+                del_ip_in_blk(ip_obj, states, conn)
             elif ip_obj['type'] == "DHCP4Range":
                 # get ips in range
-                print('delete all ips in dhcp range')
+                print('NOT HANDLED YET - delete all ips in dhcp range %s' % (ip_obj))
                 pass
             else:
                 print("object type not handled: %s" % (ip_obj['type']))
 
+
+def del_ip_in_blk(blk_obj, states, conn):
+    '''delete IPs in block with states'''
+    # first recurse blocks within blocks
+    blk_list = conn.get_bam_api_list(
+        "getEntities",
+        parentId=blk_obj['id'],
+        type="IP4Block",
+    )
+    for blk_obj in blk_list:
+        del_ip_in_blk(blk_obj, states, conn) # recursively walk the tree
+    # then for networks
+    net_list = conn.get_bam_api_list(
+        "getEntities",
+        parentId=blk_obj['id'],
+        type="IP4Network",
+    )
+    for net_obj in net_list:
+        del_ip_in_net(net_obj, states, conn)
+
+
+def del_ip_in_net(net_obj, states, conn):
+    '''delete IPs in Network with states'''
+    ip_obj_list = conn.get_ip_list( net_obj['id'], states=states)
+    for ip_obj in ip_obj_list:
+        del_ip(ip_obj, states, conn)
 
 
 def del_ip(ip_obj,states, conn ):
@@ -88,13 +121,17 @@ def del_ip(ip_obj,states, conn ):
         result = conn.delete_ip_obj(ip_obj)
         if result:
             print("delete resulted in", result)
-        # check if IP address still exists, should get id=0 if not
-        check_ip = conn.do("getEntityById", method="get", id=ip_id)
-        check_ip_id = check_ip["id"]
-        if check_ip_id == 0:
-            print("Deleted IP %s" % (ip_obj))
+        global noverify
+        if noverify:
+            print("Deleted  IP %s" % (ip_obj))
         else:
-            print("ERROR - IP address failed to delete:", json.dumps(check_ip))
+            # check if IP address still exists, should get id=0 if not
+            check_ip = conn.do("getEntityById", method="get", id=ip_id)
+            check_ip_id = check_ip["id"]
+            if check_ip_id == 0:
+                print("Deleted IP %s" % (ip_obj))
+            else:
+                print("ERROR - IP address failed to delete:", json.dumps(check_ip))
     else:
         print("skipped due to state, IP %s, state %s" % (address, state))
 
