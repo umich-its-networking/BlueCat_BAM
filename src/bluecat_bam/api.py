@@ -551,7 +551,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 obj_type = "MACAddress"
             else:
                 ip_match = self.ip_pattern.match(object_ident)
-                if ip_match.group('start'):
+                if ip_match and ip_match.group('start'):
                     part1=ip_match.group('start')
                     if ip_match.group('prefix'):
                         obj_type = "CIDR"  # IP4Block or IP4Network
@@ -764,7 +764,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return server_obj, interface_obj
 
     def get_zone(self, domain_name, view_id):
-        """get closest zone for domain_name"""
+        """find closest zone for domain_name,
+        return zone_obj,remainder (possibly dotted name)"""
         logger = logging.getLogger()
         domain_label_list = domain_name.split(".")
         logger.info(domain_label_list)
@@ -778,23 +779,23 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             logger.info(
                 "start: %s, end: %s, search: %s", zone_start, zone_end, search_domain
             )
-            zone = self.do(
+            zone_obj = self.do(
                 "getEntityByName",
                 method="get",
                 parentId=parent_id,
                 name=search_domain,
                 type="Zone",
             )
-            if zone.get("id") == 0:  # try same parent, dotted name
+            if zone_obj.get("id") == 0:  # try same parent, dotted name
                 if zone_start > 0:
                     zone_start -= 1  # decrement by one
                     search_domain = ".".join(domain_label_list[zone_start:zone_end])
                     continue
                 break
-            found_zone = zone
-            parent_id = zone.get("id")
+            found_zone_obj = zone_obj
+            parent_id = zone_obj.get("id")
             current_domain = ".".join(domain_label_list[zone_start:])
-            logger.info("current_domain: %s, zone: %s", current_domain, zone)
+            logger.info("current_domain: %s, zone: %s", current_domain, zone_obj)
             if zone_start != 0:
                 zone_end = zone_start
                 zone_start -= 1
@@ -804,19 +805,19 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 break
         remainder = ".".join(domain_label_list[0:zone_end])
         logger.info("remainder: %s", remainder)
-        return found_zone, remainder
+        return found_zone_obj, remainder
 
     def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
         """get list of entities with given fqdn and type"""
         logger = logging.getLogger()
-        zone, remainder = self.get_zone(domain_name, view_id)
+        zone_obj, remainder = self.get_zone(domain_name, view_id)
         if record_type.lower() == "zone":
-            entities = [zone]
+            entities = [zone_obj]
         else:
             entities = self.do(
                 "getEntitiesByNameUsingOptions",
                 method="get",
-                parentId=zone["id"],
+                parentId=zone_obj["id"],
                 name=remainder,
                 type=record_type,
                 options="ignoreCase=true",
