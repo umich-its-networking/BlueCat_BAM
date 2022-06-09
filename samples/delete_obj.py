@@ -8,12 +8,8 @@ Then delete the object
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
-import sys
 import json
-import argparse
 import logging
-import fileinput
 import re
 import requests
 
@@ -23,11 +19,11 @@ import bluecat_bam
 __progname__ = "delete_obj.py"
 __version__ = "0.1"
 
+
 def main():
     """delete_obj"""
 
-    config = bluecat_bam.BAM.argparsecommon(
-        "delete object")
+    config = bluecat_bam.BAM.argparsecommon("delete object")
     config.add_argument("obj_id", help="object id, or file name")
     config.add_argument(
         "--quiet", "-q", help="quiet - do not get and print object", action="store_true"
@@ -43,34 +39,34 @@ def main():
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-        id_match = re.match(r"\d+$",obj_id)
+        id_match = re.match(r"\d+$", obj_id)
         if id_match:
-            del_id(obj_id,conn, quiet)
+            del_id(obj_id, conn, quiet)
         else:
-            #for line in fileinput.input(encoding="utf-8"):
-            with open(obj_id,"r") as fd:
+            # for line in fileinput.input(encoding="utf-8"):
+            with open(obj_id, "r") as fd:
                 for line in fd:
-                    del_id(line.rstrip(),conn, quiet)
+                    del_id(line.rstrip(), conn, quiet)
 
 
-def del_id(obj_id,conn, quiet):
-    '''delete object by id'''
-    logger=logging.getLogger()
-    logger.info("deleting: %s",obj_id)
-    result=None
+def del_id(obj_id, conn, quiet):
+    """delete object by id"""
+    logger = logging.getLogger()
+    logger.info("deleting: %s", obj_id)
+    result = None
     if not quiet:
         obj = conn.do("getEntityById", id=obj_id)
-        if obj['id'] == 0:
-            print("id not found:",obj_id)
+        if obj["id"] == 0:
+            print("id not found:", obj_id)
             return
-        else:
-            print(json.dumps(obj))
+        print(json.dumps(obj))
     try:
         result = conn.do("delete", objectId=obj_id)
     except requests.exceptions.HTTPError as e:
-        print("error:",e)
+        print("error:", e)
     if result:
-        print("result:",result)
+        print("result:", result)
+
 
 if __name__ == "__main__":
     main()

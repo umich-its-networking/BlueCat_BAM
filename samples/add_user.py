@@ -5,9 +5,7 @@
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import json
-import argparse
 import logging
 
 import bluecat_bam
@@ -19,11 +17,10 @@ password = "this_password_is_not_used"  # nosec  - dummy password required,
 #                                       but not used by authenticator
 # ###### there are other assumptions in this code - review before using ######
 
+
 def main():
-    """add user""
-    config = bluecat_bam.BAM.argparsecommon(
-        "BlueCat Address Manager add user"
-    )
+    """add user"""
+    config = bluecat_bam.BAM.argparsecommon("BlueCat Address Manager add user")
     config.add_argument("newusername")
     config.add_argument("newfirstname")
     config.add_argument("newlastname")
@@ -35,11 +32,7 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    configuration_name = args.configuration
-
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
-        (configuration_id, _) = conn.get_config_and_view(configuration_name)
-
         user_obj_id = conn.do(
             "addUser",
             method="post",
@@ -60,6 +53,7 @@ def main():
         user_obj = conn.do("getEntityById", method="get", id=user_obj_id)
 
         print(json.dumps(user_obj))
+
 
 if __name__ == "__main__":
     main()

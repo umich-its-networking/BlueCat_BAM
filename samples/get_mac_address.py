@@ -76,7 +76,9 @@ configuration_obj = conn.do(
 
 configuration_id = configuration_obj["id"]
 
-mac_obj = conn.do("getMACAddress", method="get", configurationId=configuration_id, macAddress=mac)
+mac_obj = conn.do(
+    "getMACAddress", method="get", configurationId=configuration_id, macAddress=mac
+)
 # mac_id = mac_obj["id"]
 
 print(json.dumps(mac_obj))

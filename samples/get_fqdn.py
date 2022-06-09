@@ -17,7 +17,7 @@ config.add_argument(
     "--type",
     help="DNS record type, like HostRecord, AliasRecord, TXTRecord, GenericRecord, etc"
     + " or Entity to get all types",
-    default="Entity"
+    default="Entity",
 )
 config.add_argument("domain_name", help="DNS domain name or hostname")
 args = config.parse_args()

@@ -17,12 +17,8 @@ import bluecat_bam
 def main():
     """add_update_hostname_ip.py - update IP of hostname"""
     config = bluecat_bam.BAM.argparsecommon("update IP of hostname")
-    config.add_argument(
-        "hostname", help="fully qualified hostname"
-    )
-    config.add_argument(
-        "new_ip", help="new IP Address"
-    )
+    config.add_argument("hostname", help="fully qualified hostname")
+    config.add_argument("new_ip", help="new IP Address")
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -35,12 +31,7 @@ def main():
     new_ip = args.new_ip
     record_type = "HostRecord"
 
-    if not (
-        configuration_name
-        and view_name
-        and hostname
-        and new_ip
-    ):
+    if not (configuration_name and view_name and hostname and new_ip):
         config.print_help()
         sys.exit(1)
 
@@ -48,7 +39,7 @@ def main():
 
         (_, view_id) = conn.get_config_and_view(configuration_name, view_name)
 
-        zone_obj,shortname = conn.get_zone(hostname, view_id)
+        zone_obj, shortname = conn.get_zone(hostname, view_id)
         entities = conn.do(
             "getEntitiesByNameUsingOptions",
             method="get",
@@ -68,7 +59,7 @@ def main():
 
 def add_host(conn, zone_obj, shortname, new_ip, view_id):
     """add_host"""
-    host_id=conn.do(
+    host_id = conn.do(
         "addHostRecord",
         absoluteName=shortname + "." + zone_obj["properties"]["absoluteName"],
         addresses=new_ip,
@@ -77,13 +68,17 @@ def add_host(conn, zone_obj, shortname, new_ip, view_id):
         viewId=view_id,
     )
     if host_id == 0:
-        print("failed to create host record",zone_obj, shortname, new_ip)
+        print("failed to create host record", zone_obj, shortname, new_ip)
+
 
 def move_host(conn, entities, zone_obj, shortname, new_ip):
-    '''move host to new ip'''
+    """move host to new ip"""
     # note that hostname can have more than one HostRecord
     for entity in entities:
         pass
+        # **** need work here ****
+
+
 def do_entities(conn, entities, zone_obj, shortname, new_zone, new_shortname):
     """update each entity"""
     for entity in entities:
