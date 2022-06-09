@@ -111,13 +111,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             self.mount(url_prefix, adapter)
         self.login()
         # set up compiled patterns once at start for later .match
-        ip_pat = (
-            r"^(?P<start>(?:\d{1,3}\.){3}\d{1,3})(?:\/(?P<prefix>\d{1,2})|-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$"
-        )
-        self.ip_pattern = re.compile(ip_pat)
+        self.ip_pattern = re.compile(r'^(?P<start>(?:\d{1,3}\.){3}\d{1,3})'
+            r'(?:\/(?P<prefix>\d{1,2})|'
+            r'-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$')
         self.id_pattern = re.compile(r"\d+$")
-        mac_pat = r"^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})"
-        self.mac_pattern = re.compile(mac_pat)
+        self.mac_pattern = re.compile(r'^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|'
+            '[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})')
 
     # __enter__ from our parent class returns the Session object for us
 
@@ -490,7 +489,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     def get_obj_list(self, object_ident, containerId, object_type):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
-        logger.info("get_obj_list object_ident: %s, containerId: %s, object_type: %s",object_ident, containerId, json.dumps(object_type))
+        logger.info(
+            "get_obj_list object_ident: %s, containerId: %s, object_type: %s",
+            object_ident,
+            containerId,
+            json.dumps(object_type),
+        )
         obj_list = []
         if object_ident == "-":
             # return iterator someday ***
@@ -526,9 +530,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                     print("not found", line)
         return obj_list
 
-
     def match_type(self, object_ident):
-        '''uses pattern matching, finds type as
+        """uses pattern matching, finds type as
         id, MACAddress, IP4Address, CIDR, IP4Range, or None
         where CIDR could be IP4Block or IP4Network,
         and None could be a filename or other, or an error,
@@ -538,10 +541,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         CIDR returns ("CIDR", start, prefix)
         IP4Range returns ("IP4Range", start, end)
         None return (None, None, None)
-        '''
+        """
         logger = logging.getLogger()
-        part1=None
-        part2=None
+        part1 = None
+        part2 = None
         id_match = self.id_pattern.match(object_ident)
         if id_match:
             obj_type = "id"
@@ -551,70 +554,86 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 obj_type = "MACAddress"
             else:
                 ip_match = self.ip_pattern.match(object_ident)
-                if ip_match and ip_match.group('start'):
-                    part1=ip_match.group('start')
-                    if ip_match.group('prefix'):
+                if ip_match and ip_match.group("start"):
+                    part1 = ip_match.group("start")
+                    if ip_match.group("prefix"):
                         obj_type = "CIDR"  # IP4Block or IP4Network
-                        part2=ip_match.group('prefix')
-                    elif ip_match.group('end'):
+                        part2 = ip_match.group("prefix")
+                    elif ip_match.group("end"):
                         obj_type = "DHCP4Range"
-                        part2=ip_match.group('end')
+                        part2 = ip_match.group("end")
                     else:
                         obj_type = "IP4Address"
                 else:
-                    obj_type=None
-        logger.info("matched type: %s, part1 %s, part2 %s",obj_type, part1, part2)
-        return obj_type,part1,part2
+                    obj_type = None
+        logger.info("matched type: %s, part1 %s, part2 %s", obj_type, part1, part2)
+        return obj_type, part1, part2
 
     # pylint: disable=R0912
     def get_obj(self, object_ident, containerId, object_type, warn=True):
         """get an object, given an id, IP, CIDR, or range,
         return object and type matched"""
         logger = logging.getLogger()
-        logger.info("get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
-            object_ident, containerId, json.dumps(object_type), warn)
+        logger.info(
+            "get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
+            object_ident,
+            containerId,
+            json.dumps(object_type),
+            warn,
+        )
         obj_type, part1, part2 = self.match_type(object_ident)
         if object_type is None:
             object_type = ""  # standardize the value
-        obj=None
+        obj = None
         if obj_type == "id":
             obj = self.do("getEntityById", id=object_ident)
         elif obj_type == "MACAddress":
-            obj=self.do("getMACAddress", method="get", configurationId=containerId,
-                macAddress=object_ident)
-        elif obj_type=="IP4Address":
+            obj = self.do(
+                "getMACAddress",
+                method="get",
+                configurationId=containerId,
+                macAddress=object_ident,
+            )
+        elif obj_type == "IP4Address":
             obj = self.do(
                 "getIP4Address",
                 method="get",
                 containerId=containerId,
                 address=object_ident,
             )
-        elif obj_type=="CIDR":
+        elif obj_type == "CIDR":
             obj = self.get_range(part1, containerId, object_type)
-            obj_ip,obj_prefix = obj['properties']['CIDR'].split("/")
-            logger.info("CIDR obj_ip %s,obj_prefix %s,obj %s",obj_ip,obj_prefix,obj)
+            if not obj or not obj.get('id'):
+                return None,None
+            obj_ip, obj_prefix = obj["properties"]["CIDR"].split("/")
+            logger.info("CIDR obj_ip %s,obj_prefix %s,obj %s", obj_ip, obj_prefix, obj)
             while obj_ip == part1 and obj_prefix > part2:
-                obj=self.do("getParent",entityId=obj['id'])
-                obj_ip,obj_prefix = obj['properties']['CIDR'].split("/")
-                logger.info("CIDR parent obj_ip %s,obj_prefix %s,obj %s",obj_ip,obj_prefix,obj)
-            if obj and obj['id']:
-                obj_type = obj['type']
-                incidr=part1 + "/" + part2
-                if obj['properties']['CIDR'] != incidr:
-                    print("CIDR input %s did not match CIDR in %s" % (incidr,obj))
-                    obj=None
+                obj = self.do("getParent", entityId=obj["id"])
+                obj_ip, obj_prefix = obj["properties"]["CIDR"].split("/")
+                logger.info(
+                    "CIDR parent obj_ip %s,obj_prefix %s,obj %s",
+                    obj_ip,
+                    obj_prefix,
+                    obj,
+                )
+            if obj and obj["id"]:
+                obj_type = obj["type"]
+                incidr = part1 + "/" + part2
+                if obj["properties"]["CIDR"] != incidr:
+                    print("CIDR input %s did not match CIDR in %s" % (incidr, obj))
+                    obj = None
             else:
                 print("cidr not found: %s" % (object_ident))
         elif obj_type == "IP4Range":
             obj = self.get_range(part1, containerId, object_type)
-            if obj and obj['id']:
-                obj_type = obj['type']
+            if obj and obj["id"]:
+                obj_type = obj["type"]
             else:
                 print("IP4Range not found: %s" % (object_ident))
         elif obj_type is None:
             pass
         else:
-            print("answer from match_type not recognized",obj_type, part1, part2)
+            print("answer from match_type not recognized", obj_type, part1, part2)
         logger.info("get_obj returns %s of type %s", obj, obj_type)
         if not obj and warn:
             print("Warning - no object found for:", object_ident, file=sys.stderr)
@@ -632,7 +651,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         if object_type is None:
             object_type = ""  # standardize the value
         obj = self.do(
-            "getIPRangedByIP", address=address, containerId=containerId, type=object_type
+            "getIPRangedByIP",
+            address=address,
+            containerId=containerId,
+            type=object_type,
         )
         if obj:
             obj_id = obj.get("id")
