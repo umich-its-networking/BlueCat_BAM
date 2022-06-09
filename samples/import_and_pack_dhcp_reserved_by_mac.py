@@ -182,7 +182,17 @@ def get_args():
         help="verify that the IP and mac addresses in the import file match"
         + " the BAM, but do not change anything.",
     )
+    config.add_argument(
+        "--pack",
+        default="yes",
+        help="yes, no, or later, default is yes."
+        + " later does not change the IP or state for entries that it would have moved,"
+        + " but updates the ipname and DNS-name."
+    )
     args = config.parse_args()
+    if args.pack not in ("yes", "no", "later"):
+        config.print_help()
+        raise ValueError
     return args
 
 
@@ -298,6 +308,8 @@ def walk_subnet(
     # IP address in import data is ignored
     logger = logging.getLogger()
     current_ip = first_ip
+    args.reserve = True
+
     needed = len(mac_import_dict)
     later_ip_list = []
     while current_ip != last_ip and needed > 0:  # pylint: disable=R1702
@@ -320,7 +332,6 @@ def walk_subnet(
                             line_d,
                             ip_obj,
                             conn,
-                            args.checkonly,
                             configuration_id,
                             view_id,
                             args,
@@ -367,24 +378,31 @@ def second_walk(
     index = 0
     for mac, line_d in mac_import_dict.items():
         print("mac, line_d", mac, line_d)
-        current_ip = later_ip_list[index]
         from_ip = ipaddress.ip_address(line_d["ip"])
-        print("move %s to %s" % (from_ip, current_ip))
-        ip_obj = ip_dict.get(current_ip)
-        print("index, current_ip, ip_obj", current_ip, ip_obj)
-        # delete old
-        old_obj = ip_dict.get(from_ip)
-        if old_obj:
-            print("delete", old_obj)
-            result = conn.delete_ip_obj(old_obj)
-            if result:
-                print("deleting old IP result:", result)
+        if args.pack == 'yes':
+            current_ip = later_ip_list[index]
+            print("move %s to %s" % (from_ip, current_ip))
+            ip_obj = ip_dict.get(current_ip)
+            print("index, current_ip, ip_obj", index, current_ip, ip_obj)
+            # delete old
+            old_obj = ip_dict.get(from_ip)
+            if old_obj:
+                print("delete", old_obj)
+                result = conn.delete_ip_obj(old_obj)
+                if result:
+                    print("deleting old IP result:", result)
+        else:
+            # --pack 'no' or 'later'
+            # leave imports where thay are
+            current_ip = from_ip
+            ip_obj = ip_dict.get(current_ip)
+            print("index, current_ip, ip_obj", index, current_ip, ip_obj)
+            args.reserve = False
         match_to_existing(
             current_ip,
             line_d,
             ip_obj,
             conn,
-            args.checkonly,
             configuration_id,
             view_id,
             args,
@@ -393,7 +411,7 @@ def second_walk(
 
 
 def match_to_existing(
-    current_ip, line_d, ip_obj, conn, checkonly, configuration_id, view_id, args
+    current_ip, line_d, ip_obj, conn, configuration_id, view_id, args
 ):
     """compare import and existing data, then add or update"""
     logger = logging.getLogger()
@@ -438,22 +456,21 @@ def match_to_existing(
     #      mac is same - ok
     # ip is DHCP_FREE or other - warn
 
-    if checkonly:
+    if args.checkonly:
         do_checkonly(counts, line_d, ip_obj, obj_mac, obj_state)
-        # continue
-
-    # not in checkonly node, take action
-    do_action(
-        conn,
-        current_ip,
-        ip_obj,
-        line_d,
-        line_mac,
-        obj_state,
-        configuration_id,
-        view_id,
-        args,
-    )
+    else:
+        # not in checkonly node, take action
+        do_action(
+            conn,
+            current_ip,
+            ip_obj,
+            line_d,
+            line_mac,
+            obj_state,
+            configuration_id,
+            view_id,
+            args,
+        )
 
 
 def do_action(
@@ -493,26 +510,27 @@ def do_action(
         if not line_mac:
             print("ERROR - no mac in import or BlueCat")
             return
-        if obj_state in ("DHCP_ALLOCATED", "STATIC"):
-            ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
+        if args.pack != "later" or args.reserve == True:
+            if obj_state in ("DHCP_ALLOCATED", "STATIC"):
+                ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
 
-        elif obj_state == "DHCP_FREE":
-            replace_dhcp_free(
-                conn,
-                ip_obj,
-                str(current_ip),
-                line_mac,
-                line_d["name"],
-                line_d["fqdn"],
-                configuration_id,
-                view_id,
-            )
+            elif obj_state == "DHCP_FREE":
+                replace_dhcp_free(
+                    conn,
+                    ip_obj,
+                    str(current_ip),
+                    line_mac,
+                    line_d["name"],
+                    line_d["fqdn"],
+                    configuration_id,
+                    view_id,
+                )
 
-        elif obj_state == "DHCP_RESERVED":
-            update_dhcp_reserved(conn, ip_obj, line_mac, line_d["name"])
+            elif obj_state == "DHCP_RESERVED":
+                update_dhcp_reserved(conn, ip_obj, line_mac, line_d["name"])
 
-        else:
-            print("error - cannot handle state:", obj_state)
+            else:
+                print("error - cannot handle state:", obj_state)
 
     # fqdn
     do_fqdn(conn, current_ip, line_d["fqdn"], view_id, line_d)
