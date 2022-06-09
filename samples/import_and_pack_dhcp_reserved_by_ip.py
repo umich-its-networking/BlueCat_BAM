@@ -221,8 +221,8 @@ def main():
         # get DHCP range(s)
         # {"id": 8869275, "name": null, "type": "DHCP4Range", "properties":
         # {"start": "10.213.135.5", "end": "10.213.135.254"}}
-        range_list = get_dhcp_ranges(network_obj["id"], conn)
-        range_info_list = get_dhcp_ranges_info(range_list)
+        range_list = conn.get_dhcp_ranges(network_obj["id"])
+        range_info_list = conn.make_dhcp_ranges_list(range_list)
 
         # get IP info from BAM
         # {"id": 17396816, "name": "MYPC-1450", "type": "IP4Address",
@@ -420,7 +420,7 @@ def do_action(
 
         ip_obj = make_dhcp_reserved(
             conn,
-            line_d["ip"],
+            current_ip,
             line_mac,
             line_d["name"],
             line_d["fqdn"],
@@ -442,7 +442,7 @@ def do_action(
             replace_dhcp_free(
                 conn,
                 ip_obj,
-                line_d["ip"],
+                current_ip,
                 line_mac,
                 line_d["name"],
                 line_d["fqdn"],
@@ -528,36 +528,6 @@ def parse_line(line, line_pat):
             return None
     logger.info("ip,mac,name,fqdn,other: %s", json.dumps(line_d))
     return line_d
-
-
-def get_dhcp_ranges_info(range_list):
-    """return sorted list of dict with the start and end IP ipaddress objects
-    and the range object, like:
-    [
-        { "start": start_ip_obj, "end": end_ip_obj, "range": range_obj }
-        ...
-    ]"""
-    logger = logging.getLogger()
-    range_info_list = []
-    for dhcp_range in range_list:
-        start = ipaddress.ip_address(dhcp_range["properties"]["start"])
-        end = ipaddress.ip_address(dhcp_range["properties"]["end"])
-        range_info_list.append({"start": start, "end": end, "range": dhcp_range})
-    logger.info(range_info_list)
-    range_info_list.sort(key=lambda self: self["start"])
-    return range_info_list
-
-
-def get_dhcp_ranges(networkid, conn):
-    """get list of ranges"""
-    logger = logging.getLogger()
-    range_list = conn.get_bam_api_list(
-        "getEntities",
-        parentId=networkid,
-        type="DHCP4Range",
-    )
-    logger.debug(range_list)
-    return range_list
 
 
 def get_either_mac(line_mac, conn, configuration_id, ip_obj, args):
