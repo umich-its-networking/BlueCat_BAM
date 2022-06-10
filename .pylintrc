@@ -4,12 +4,14 @@
 const-rgx=^([a-z_][a-z0-9_]{0,30}|[A-Z_][A-Z0-9_]{0,30})$
 variable-rgx=^[a-z_][a-zA-Z0-9_]{0,35}$
 module-rgx=^[a-z_][a-zA-Z0-9_]{2,35}$
-argument-rgx=^[a-z_][a-zA-Z0-9_]{2,35}$
+argument-rgx=^[a-z_][a-zA-Z0-9_]{1,35}$
 include-naming-hint=y
 
 # expect duplicate code, for stand-alone modules
 # might refactor someday
-disable=duplicate-code,C0330
+disable=duplicate-code,W1514,C0209
+# W1514 unnecessary - wants encoding specified on every 'open'
+# C0330 was removed from pylint between 1.11 and 1.14
 
 # show error msg_id, so I can use it in 'disable' if needed, to save space
 msg-template={msg_id}:{line:3d},{column}: {obj}: {msg}

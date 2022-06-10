@@ -2,17 +2,16 @@
 
 """
 add_DNS_Deployment_Role_list.py list-of-DNSservername-and-role
-[--cfg configuration] [--view viewname]
+[--cfg configuration] [--view viewname] serverlist
 < list-of-CIDR-or-zonename
+
+"serverlist"="file with servername and DNS role on each line"
 """
 
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import os
 import sys
-import json
-import argparse
 import logging
 import re
 
@@ -21,60 +20,6 @@ import bluecat_bam
 
 __progname__ = "add_DNS_Deployment_Role_list"
 __version__ = "0.1"
-
-
-def argparsecommon():
-    """set up common argparse arguments for BlueCat API"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager add_DNS_Deployment_Role_list"
-    )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--configuration",
-        "--cfg",
-        help="BlueCat Configuration name",
-        default=os.getenv("BLUECAT_CONFIGURATION"),
-    )
-    config.add_argument(
-        "--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW")
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or less will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    return config
 
 
 def readserverlist(serverlistfile, conn, configuration_id):
@@ -100,52 +45,14 @@ def readserverlist(serverlistfile, conn, configuration_id):
                 print("ERROR - role not valid:", role)
                 sys.exit(1)
 
-            server_obj_list = conn.do(
-                "getEntitiesByName",
-                parentId=configuration_id,
-                name=server_name,
-                type="Server",
-                start=0,
-                count=2,  # error if more than one
-            )
-            # print(json.dumps(server_obj_list))
-            if len(server_obj_list) > 1:
-                print(
-                    "ERROR - found more than one server for name",
-                    server_name,
-                    json.dumps(server_obj_list),
-                )
-                sys.exit(1)
-            if len(server_obj_list) < 1:
-                print("ERROR - server not found for", server_name)
-                sys.exit(1)
-            server_id = server_obj_list[0]["id"]
-            if server_id == 0:
-                print("ERROR - server not found for name", server_name)
-                sys.exit(1)
-
-            interface_obj_list = conn.do(
-                "getEntities",
-                method="get",
-                parentId=server_id,
-                type="NetworkServerInterface",
-                start=0,
-                count=1000,
-            )
-            if len(interface_obj_list) > 1:
-                print(
-                    "ERROR - more than one interface found",
-                    json.dumps(interface_obj_list),
-                )
-                sys.exit(3)
-            interfaceid = interface_obj_list[0]["id"]
-            if interfaceid == 0:
-                print("ERROR - interface not found")
-                sys.exit(4)
-
-            row = (interfaceid, role, server_name)
-            interface_list.append(row)
-
+            interface = conn.getinterface(server_name, configuration_id)
+            if interface:
+                interfaceid = interface["id"]
+                row = (interfaceid, role, server_name)
+                interface_list.append(row)
+            else:
+                print("server interface not found: %s" % (server_name))
+                return None
             # print(interface_obj_list[0])
             # done building the interfaces list
 
@@ -299,7 +206,7 @@ def get_zone(zone_name, view_id, conn):
 
 def main():
     """add DNS Deployment Role list"""
-    config = argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon()
     config.add_argument(
         "serverlist", help="file with servername and DNS role on each line"
     )

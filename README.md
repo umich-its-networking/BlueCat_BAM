@@ -29,14 +29,14 @@ Sample output:
 
 Or use on the command line as a CLI, putting the setup in the environment:
 ```
-touch mybluecat.env
-chmod 700 mybluecat.env
-cat >> mybluecat.env <<EOF
+touch bluecat.env
+chmod 700 bluecat.env
+cat >> bluecat.env <<EOF
 export BLUECAT_SERVER=bluecatservername.domain.example
 export BLUECAT_USERNAME=myusername
 export BLUECAT_PASSWORD=mypassword
 EOF
-source mybluecat.env
+source bluecat.env
 bam getEntityByName parentId=0 name=admin type=User
 ```
 Sample output:

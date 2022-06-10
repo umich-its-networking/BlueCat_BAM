@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""getwald.py"""
+"""getwadl.py"""
 
 # to be python2/3 compatible:
 from __future__ import print_function

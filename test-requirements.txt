@@ -1,4 +1,4 @@
-pylint
+pylint==2.14.1
 flake8
 pytest
 bandit
