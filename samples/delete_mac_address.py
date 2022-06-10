@@ -49,8 +49,6 @@ def main():
 
         entity_list = conn.get_obj_list(mac, configuration_id, rangetype)
         for mac_obj in entity_list:
-            mac_id = mac_obj.get("id")
-
             if mac_obj["type"] != "MACAddress":
                 print("error, not a MACAddress:", mac)
                 continue
@@ -59,7 +57,7 @@ def main():
 
             ip_obj_list = conn.do(
                 "getLinkedEntities",
-                entityId=mac_id,
+                entityId=mac_obj.get("id"),
                 type="IP4Address",
                 start=0,
                 count=9999,
@@ -69,12 +67,10 @@ def main():
             print("linked IPv4:", json.dumps(ip_obj_list))
             out = mac
             for ip_obj in ip_obj_list:
-                out = (
-                    out
-                    + " "
-                    + ip_obj["properties"]["address"]
-                )
-                expiry = ip_obj["properties"].get("expiryTime") # no expiry for DHCP_RESERVED
+                out = out + " " + ip_obj["properties"]["address"]
+                expiry = ip_obj["properties"].get(
+                    "expiryTime"
+                )  # no expiry for DHCP_RESERVED
                 if expiry:
                     out = out + " " + expiry
                 state = ip_obj["properties"]["state"]
@@ -115,8 +111,7 @@ def main():
             result = conn.do("delete", method="delete", objectId=mac_obj["id"])
             # check if MAC address still exists, should get id=0 if not
             check_mac = conn.do("getEntityById", method="get", id=mac_obj["id"])
-            check_mac_id = check_mac["id"]
-            if check_mac_id == 0:
+            if check_mac["id"] == 0:
                 print("Deleted MAC ", end="")
             else:
                 print("ERROR - MAC address failed to delete:")

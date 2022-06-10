@@ -111,12 +111,16 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             self.mount(url_prefix, adapter)
         self.login()
         # set up compiled patterns once at start for later .match
-        self.ip_pattern = re.compile(r'^(?P<start>(?:\d{1,3}\.){3}\d{1,3})'
-            r'(?:\/(?P<prefix>\d{1,2})|'
-            r'-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$')
+        self.ip_pattern = re.compile(
+            r"^(?P<start>(?:\d{1,3}\.){3}\d{1,3})"
+            r"(?:\/(?P<prefix>\d{1,2})|"
+            r"-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$"
+        )
         self.id_pattern = re.compile(r"\d+$")
-        self.mac_pattern = re.compile(r'^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|'
-            '[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})')
+        self.mac_pattern = re.compile(
+            r"^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|"
+            "[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})"
+        )
 
     # __enter__ from our parent class returns the Session object for us
 
@@ -603,8 +607,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             )
         elif obj_type == "CIDR":
             obj = self.get_range(part1, containerId, object_type)
-            if not obj or not obj.get('id'):
-                return None,None
+            if not obj or not obj.get("id"):
+                return None, None
             obj_ip, obj_prefix = obj["properties"]["CIDR"].split("/")
             logger.info("CIDR obj_ip %s,obj_prefix %s,obj %s", obj_ip, obj_prefix, obj)
             while obj_ip == part1 and obj_prefix > part2:

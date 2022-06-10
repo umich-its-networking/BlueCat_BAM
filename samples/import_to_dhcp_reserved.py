@@ -177,6 +177,7 @@ def main():
         # "", "macAddress": ""}}
 
         # now read the data from csv file from controller
+        # inputfile format:  IP,MAC,name,fqdn
         line_pat = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($| |\t|,)")
         with open(args.inputfile) as f:
             for line in f:

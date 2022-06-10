@@ -187,7 +187,7 @@ def get_args():
         default="yes",
         help="yes, no, or later, default is yes."
         + " later does not change the IP or state for entries that it would have moved,"
-        + " but updates the ipname and DNS-name."
+        + " but updates the ipname and DNS-name.",
     )
     args = config.parse_args()
     if args.pack not in ("yes", "no", "later"):
@@ -379,7 +379,7 @@ def second_walk(
     for mac, line_d in mac_import_dict.items():
         print("mac, line_d", mac, line_d)
         from_ip = ipaddress.ip_address(line_d["ip"])
-        if args.pack == 'yes':
+        if args.pack == "yes":
             current_ip = later_ip_list[index]
             print("move %s to %s" % (from_ip, current_ip))
             ip_obj = ip_dict.get(current_ip)
@@ -510,7 +510,7 @@ def do_action(
         if not line_mac:
             print("ERROR - no mac in import or BlueCat")
             return
-        if args.pack != "later" or args.reserve == True:
+        if args.pack != "later" or args.reserve is True:
             if obj_state in ("DHCP_ALLOCATED", "STATIC"):
                 ip_obj = update_dhcp_allocated(conn, ip_obj, line_mac, line_d["name"])
 

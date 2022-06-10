@@ -80,9 +80,9 @@ def del_ip_in_blk(blk_obj, states, conn, noverify):
         parentId=blk_obj["id"],
         type="IP4Block",
     )
-    for blk_obj in blk_list:
+    for next_blk_obj in blk_list:
         # make copy of blk_obj ??? ****
-        del_ip_in_blk(blk_obj, states, conn, noverify)  # recursively walk the tree
+        del_ip_in_blk(next_blk_obj, states, conn, noverify)  # recursively walk the tree
     # then for networks
     net_list = conn.get_bam_api_list(
         "getEntities",
