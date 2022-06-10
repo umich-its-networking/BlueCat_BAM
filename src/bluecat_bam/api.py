@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# pylint: disable=C0302,E1136
+# disable too many lines and unsubscriptable
 
 """BlueCat Address Manager (BAM) REST API Python2 module
 

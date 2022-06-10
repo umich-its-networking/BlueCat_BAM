@@ -54,7 +54,9 @@ def main():
             print("not found, adding")
             add_host(conn, zone_obj, shortname, new_ip, view_id)
         else:
-            move_host(conn, entities, zone_obj, shortname, new_ip)
+            # future
+            # move_host(conn, entities, zone_obj, shortname, new_ip)
+            pass
 
 
 def add_host(conn, zone_obj, shortname, new_ip, view_id):
@@ -71,12 +73,13 @@ def add_host(conn, zone_obj, shortname, new_ip, view_id):
         print("failed to create host record", zone_obj, shortname, new_ip)
 
 
-def move_host(conn, entities, zone_obj, shortname, new_ip):
-    """move host to new ip"""
-    # note that hostname can have more than one HostRecord
-    for entity in entities:
-        pass
-        # **** need work here ****
+# future
+# def move_host(conn, entities, zone_obj, shortname, new_ip):
+#    """move host to new ip"""
+#    # note that hostname can have more than one HostRecord
+#    for entity in entities:
+#        pass
+#        # **** need work here ****
 
 
 def do_entities(conn, entities, zone_obj, shortname, new_zone, new_shortname):
