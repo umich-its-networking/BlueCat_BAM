@@ -70,7 +70,7 @@ __version__ = "0.2.7"
 
 # python2/3 compatability
 try:
-    basestring
+    basestring  # pylint: disable=E0601
 except NameError:
     basestring = str  # pylint: disable=invalid-name,redefined-builtin
 
@@ -1038,7 +1038,7 @@ class DhcpRangeList(list):  # pylint: disable=R0902
         if ip < self.network_ip or ip > self.broadcast_ip:
             return False
         # search ranges
-        while self.range_num < self.__len__():
+        while self.range_num < len(self):
             if ip <= self[self.range_num]["end"]:
                 if ip >= self[self.range_num]["start"]:
                     return True
