@@ -123,6 +123,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             r"^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|"
             "[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})"
         )
+        self.fqdn_pattern = re.compile(r"[a-zA-Z0-9-_]+(\.[a-zA-Z0-9-_]+)*")
 
     # __enter__ from our parent class returns the Session object for us
 
@@ -510,7 +511,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
         obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False)
-        if obj and obj.get("id"):
+        if obj and (obj_type == "fqdn" or obj["id"]):
             obj_list = [obj]
         elif obj_type:
             print("not found", object_ident, obj_type)
@@ -526,11 +527,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
 
     def get_obj_lines(self, fd, containerId, object_type):
         """read lines, get obj, return obj list"""
+        logger = logging.getLogger()
         obj_list = []
         for line in fd:
             if line.strip() != "":
-                obj, _ = self.get_obj(line.strip(), containerId, object_type)
-                if obj and obj["id"]:
+                obj, object_type = self.get_obj(line.strip(), containerId, object_type)
+                logger.info("get_obj_lines got obj %s, ", obj)
+                if obj and (object_type == "fqdn" or obj["id"]):
                     obj_list.append(obj)
                 else:
                     print("not found", line)
@@ -538,7 +541,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
 
     def match_type(self, object_ident):
         """uses pattern matching, finds type as
-        id, MACAddress, IP4Address, CIDR, IP4Range, or None
+        id, MACAddress, IP4Address, CIDR, IP4Range, fqdn, or None
         where CIDR could be IP4Block or IP4Network,
         and None could be a filename or other, or an error,
         id returns ("id", None, None)
@@ -546,6 +549,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         IP returns ("IP4Address", ip, None)
         CIDR returns ("CIDR", start, prefix)
         IP4Range returns ("IP4Range", start, end)
+        fqdn returns ("fqdn", None, None)
         None return (None, None, None)
         """
         logger = logging.getLogger()
@@ -571,7 +575,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                     else:
                         obj_type = "IP4Address"
                 else:
-                    obj_type = None
+                    fqdn_match = self.fqdn_pattern.match(object_ident)
+                    if fqdn_match:
+                        obj_type = "fqdn"
+                    else:
+                        obj_type = None
         logger.info("matched type: %s, part1 %s, part2 %s", obj_type, part1, part2)
         return obj_type, part1, part2
 
@@ -636,6 +644,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 obj_type = obj["type"]
             else:
                 print("IP4Range not found: %s" % (object_ident))
+        elif obj_type == "fqdn":
+            # just return the fqdn, because it can resolve to multiple objects
+            obj = object_ident
+            # obj = self.get_fqdn(object_ident, containerId, object_type)
         elif obj_type is None:
             pass
         else:
@@ -802,6 +814,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         search_domain = ".".join(domain_label_list[zone_start:zone_end])
         current_domain = ""
         parent_id = view_id
+        found_zone_obj = None
 
         while True:
             logger.info(
