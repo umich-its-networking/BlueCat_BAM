@@ -342,8 +342,11 @@ def walk_subnet(
                             print(
                                 "active but not in import, convert to DHCP Reserved",
                                 current_ip,
+                                ip_obj,
+                                mac,
                             )
-                            new_ip_obj = update_dhcp_allocated(conn, ip_obj, mac, None)
+
+                            new_ip_obj = update_dhcp_allocated(conn, ip_obj, mac, "")
                             print(new_ip_obj)
                             # leave any name or hostname unchanged
                         else:

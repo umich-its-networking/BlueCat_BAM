@@ -205,6 +205,8 @@ def main():
 
     configuration_name = args.configuration
     exclude_list = args.exclude
+    if not exclude_list:
+        exclude_list = []
     # print(exclude_list)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
