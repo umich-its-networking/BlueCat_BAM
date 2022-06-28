@@ -1036,26 +1036,35 @@ class DhcpRangeList(list):  # pylint: disable=R0902
             self.end = self.broadcast_ip
 
     def in_range(self, ip):
-        """check if given IP is in any of the DHCP raanges"""
+        """check if given IP is in any of the DHCP ranges"""
+        # NOT TESTED AND NOT USED ANYWHERE YET
         # note that this is most efficient if IP's are checked in ascending order
+        # by checking the range that the last IP was in first
         if ip < self.gap:
             # restart range search
             self.range_num = 0
+            self.gap = self.network_ip
         elif ip < self.start:
             return False
         elif ip < self.end:
             return True
         else:
+            self.gap = self[self.range_num]["end"] + 1
             self.range_num += 1
         # outside network?
         if ip < self.network_ip or ip > self.broadcast_ip:
             return False
         # search ranges
+        self.start = self[self.range_num]["start"]
+        self.end = self[self.range_num]["end"]
         while self.range_num < len(self):
-            if ip <= self[self.range_num]["end"]:
-                if ip >= self[self.range_num]["start"]:
+            if ip <= self.end:
+                if ip >= self.start:
                     return True
                 return False
             # move to next range
+            self.gap = self[self.range_num]["end"] + 1
             self.range_num += 1
+            self.start = self[self.range_num]["start"]
+            self.end = self[self.range_num]["end"]
         return False
