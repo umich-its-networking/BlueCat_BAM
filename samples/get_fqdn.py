@@ -5,7 +5,6 @@
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 
@@ -32,24 +31,16 @@ def main():
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.logging)
 
-    configuration_name = args.configuration
-    view_name = args.view
     record_type = args.type
-    domain_name = args.domain_name
-
-    if not (configuration_name and view_name and record_type and domain_name):
-        config.print_help()
-        sys.exit(1)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-        (_, view_id) = conn.get_config_and_view(configuration_name, view_name)
+        (_, view_id) = conn.get_config_and_view(args.configuration, args.view)
 
-        obj_list = conn.get_obj_list(domain_name, view_id, record_type)
+        obj_list = conn.get_obj_list(args.domain_name, view_id, record_type)
 
         for domain_name in obj_list:
             get_fqdn(domain_name, view_id, record_type, conn)
-            # print(obj)
 
 
 def get_fqdn(domain_name, view_id, record_type, conn):
