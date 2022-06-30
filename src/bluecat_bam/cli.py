@@ -62,7 +62,7 @@ import sys
 import logging
 import json
 import argparse
-from bluecat_bam.api import BAM
+import bluecat_bam
 
 # double underscore names
 __progname__ = "cli"
@@ -167,7 +167,7 @@ def main():
     logging.debug("raw_in: %s", args.raw_in)
 
     # call MAIN
-    with BAM(
+    with bluecat_bam.BAM(
         args.server,
         args.username,
         args.password,
