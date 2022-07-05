@@ -116,7 +116,6 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
             print("new: %s" % (accessright))
         else:
             print("add access right: %s" % (accessright))
-            #conn.do("getAccessRight", entityId=accessright["entityId"], userId=to_group_id)
             accessrightid = conn.do(
                 "addAccessRight",
                 entityId=accessright["entityId"],
