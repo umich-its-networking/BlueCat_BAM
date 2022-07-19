@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 """
-replace_DHCP_Deployment_Role_list.py primaryDHCPservername [failoverDHCPservername]
-[--cfg configuration]
+replace_DHCP_Deployment_Role.py primaryDHCPservername [failoverDHCPservername]
 < list-of-IP-or-CIDR
 """
 
@@ -16,55 +15,8 @@ import logging
 import bluecat_bam
 
 
-__progname__ = "replace_DHCP_Deployment_Role_list"
+__progname__ = "replace_DHCP_Deployment_Role"
 __version__ = "0.1"
-
-
-def getinterfaceid(server_name, configuration_id, conn):
-    """get server interface id"""
-    server_obj_list = conn.do(
-        "getEntitiesByName",
-        parentId=configuration_id,
-        name=server_name,
-        type="Server",
-        start=0,
-        count=2,  # error if more than one
-    )
-    # print(json.dumps(server_obj_list))
-    if len(server_obj_list) > 1:
-        print(
-            "ERROR - found more than one server for name",
-            server_name,
-            json.dumps(server_obj_list),
-        )
-        sys.exit(1)
-    if len(server_obj_list) < 1:
-        print("ERROR - server not found for", server_name)
-        sys.exit(1)
-    server_id = server_obj_list[0]["id"]
-    if server_id == 0:
-        print("ERROR - server not found for name", server_name)
-        sys.exit(1)
-
-    interface_obj_list = conn.do(
-        "getEntities",
-        method="get",
-        parentId=server_id,
-        type="NetworkServerInterface",
-        start=0,
-        count=1000,
-    )
-    if len(interface_obj_list) > 1:
-        print("ERROR - more than one interface found:")
-        # , json.dumps(interface_obj_list))
-        for obj in interface_obj_list:
-            print(obj["name"])
-        sys.exit(3)
-    interfaceid = interface_obj_list[0]["id"]
-    if interfaceid == 0:
-        print("ERROR - interface not found")
-        sys.exit(4)
-    return interfaceid
 
 
 def add_dhcp_roles(entityId, interfaceid, properties, conn):
@@ -106,8 +58,8 @@ def get_network(network_ip, configuration_id, conn):
 
 
 def main():
-    """replace DNS Deployment Role list"""
-    config = bluecat_bam.BAM.argparsecommon()
+    """replace DNS Deployment Role"""
+    config = bluecat_bam.BAM.argparsecommon("replace DNS Deployment Role")
     config.add_argument("primaryDHCPservername")
     # cannot use None as a default value
     config.add_argument("failoverDHCPservername", default=None)
@@ -130,14 +82,12 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        interface = conn.getinterface(
-            args.primaryDHCPservername, configuration_id, conn
-        )
+        interface = conn.getinterface(args.primaryDHCPservername, configuration_id)
         interfaceid = interface["id"]
         logger.info("interface %s", interface)
         if args.failoverDHCPservername:
             failover_obj = conn.getinterface(
-                args.failoverDHCPservername, configuration_id, conn
+                args.failoverDHCPservername, configuration_id
             )
             failover = failover_obj["id"]
             properties = "secondaryServerInterfaceId=" + str(failover) + "|"

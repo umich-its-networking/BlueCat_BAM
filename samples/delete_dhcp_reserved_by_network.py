@@ -9,7 +9,6 @@ delete_dhcp_reserved_by_network.py < list-of-networkIP
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import logging
 
 import bluecat_bam
@@ -50,7 +49,7 @@ def get_dhcp_reserved(networkid, conn):
     reserved_list = [
         ip for ip in ip_list if ip["properties"]["state"] == "DHCP_RESERVED"
     ]
-    print("dhcp", len(ip_list), "reserved", len(reserved_list), file=sys.stderr)
+    print("dhcp", len(ip_list), "reserved", len(reserved_list))
     return reserved_list
 
 
@@ -99,7 +98,7 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         logger.info("obj_list: %s", obj_list)
 
         for entity in obj_list:

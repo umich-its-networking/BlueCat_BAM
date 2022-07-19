@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# pylint: disable=C0302,E1136
+# disable too many lines and unsubscriptable
 
 """BlueCat Address Manager (BAM) REST API Python2 module
 
@@ -58,6 +60,7 @@ import json
 import argparse
 import os
 import re
+import ipaddress
 import requests
 
 
@@ -67,12 +70,12 @@ __version__ = "0.2.7"
 
 # python2/3 compatability
 try:
-    basestring
+    basestring  # pylint: disable=E0601
 except NameError:
     basestring = str  # pylint: disable=invalid-name,redefined-builtin
 
 
-class BAM(requests.Session):  # pylint: disable=R0902
+class BAM(requests.Session):  # pylint: disable=R0902,R0904
     """subclass requests and
     redefine requests.request to a simpler BlueCat interface"""
 
@@ -85,12 +88,15 @@ class BAM(requests.Session):  # pylint: disable=R0902
         raw_in=False,
         timeout=None,
         max_retries=None,
+        verify=True,
     ):
         """login to BlueCat server API, get token, set header"""
         self.username = username
         self.password = password
         self.timeout = timeout
+        self.verify = verify
         self.raw = bool(raw)
+        self.parentviewcache = {}  # zoneid: viewid
         logging.info("raw: %s", self.raw)
         self.raw_in = bool(raw_in)
         logging.info("raw_in: %s", self.raw_in)
@@ -106,6 +112,18 @@ class BAM(requests.Session):  # pylint: disable=R0902
             url_prefix = self.mainurl.split("://", 1)[0] + "://"
             self.mount(url_prefix, adapter)
         self.login()
+        # set up compiled patterns once at start for later .match
+        self.ip_pattern = re.compile(
+            r"^(?P<start>(?:\d{1,3}\.){3}\d{1,3})"
+            r"(?:\/(?P<prefix>\d{1,2})|"
+            r"-(?P<end>(?:\d{1,3}\.){3}\d{1,3})|)$"
+        )
+        self.id_pattern = re.compile(r"\d+$")
+        self.mac_pattern = re.compile(
+            r"^((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}|"
+            "[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{4}[.]){2}[0-9a-fA-F]{4})"
+        )
+        self.fqdn_pattern = re.compile(r"[a-zA-Z0-9-_]+(\.[a-zA-Z0-9-_]+)*")
 
     # __enter__ from our parent class returns the Session object for us
 
@@ -199,6 +217,7 @@ class BAM(requests.Session):  # pylint: disable=R0902
             data=data,
             params=kwargs,
             timeout=self.timeout,
+            verify=self.verify,
         )
         logging.info(vars(response.request))
         logging.info("response: %s", response.text)
@@ -369,12 +388,10 @@ class BAM(requests.Session):  # pylint: disable=R0902
         return method_from_wadl
 
     @staticmethod
-    def argparsecommon():
+    def argparsecommon(description=""):
         """set up common argparse arguments for BlueCat API"""
         # usage: config = bluecat_bam.BAM.argparsecommon()
-        config = argparse.ArgumentParser(
-            description="BlueCat Address Manager add_DNS_Deployment_Role_list"
-        )
+        config = argparse.ArgumentParser(description=description)
         config.add_argument(
             "--server",
             "-s",
@@ -452,99 +469,216 @@ class BAM(requests.Session):  # pylint: disable=R0902
             view_id = None
         return configuration_id, view_id
 
-    # @staticmethod
-    def get_id_list(self, conn, object_ident, containerId, rangetype):
+    def get_bam_api_list(self, apiname, **kwargs):
+        """wrap api call with loop to handle 'start' and 'count'"""
+        if not kwargs.get("count"):
+            kwargs["count"] = 1000
+        if not kwargs.get("start"):
+            kwargs["start"] = 0
+        count = kwargs["count"]
+        replysize = count
+        listall = []
+        start = kwargs["start"]
+        while replysize == count:
+            kwargs["start"] = start
+            listone = self.do(apiname, **kwargs)
+            replysize = len(listone)
+            start += replysize
+            listall.extend(listone)
+        return listall
+
+    def get_id_list(self, object_ident, containerId, object_type):
         """get object id, or a list of objects from a file"""
-        obj_list = self.get_obj_list(conn, object_ident, containerId, rangetype)
+        obj_list = self.get_obj_list(object_ident, containerId, object_type)
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
-    # @staticmethod
-    def get_obj_list(self, conn, object_ident, containerId, rangetype):
+    def get_obj_list(self, object_ident, containerId, object_type):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
+        logger.info(
+            "get_obj_list object_ident: %s, containerId: %s, object_type: %s",
+            object_ident,
+            containerId,
+            json.dumps(object_type),
+        )
+        obj_list = []
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                obj_list = [
-                    self.get_obj(conn, line.strip(), containerId, rangetype)
-                    for line in f
-                    if line.strip() != ""
-                ]
+                obj_list = self.get_obj_lines(f, containerId, object_type)
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
-        obj = self.get_obj(conn, object_ident, containerId, rangetype, warn=False)
-        if obj and obj.get("id"):
+        obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False)
+        if obj and (obj_type == "fqdn" or obj["id"]):
             obj_list = [obj]
+        elif obj_type:
+            print("not found", object_ident, obj_type)
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    obj_list = [
-                        self.get_obj(conn, line.strip(), containerId, rangetype)
-                        for line in f
-                        if line.strip() != ""
-                    ]
-                # remove failed entries
+                    obj_list = self.get_obj_lines(f, containerId, object_type)
                 logger.info(obj_list)
-                new_obj_list = [obj for obj in obj_list if obj]
-                logger.info(new_obj_list)
-                return new_obj_list
+                return obj_list
             except ValueError:
                 logger.info("failed to find object or open file: '%s'", object_ident)
-                obj_list = []
         return obj_list
 
-    # @staticmethod
-    def get_obj(self, conn, object_ident, containerId, rangetype, warn=True):
-        """get an object, given an id, IP, CIDR, or range"""
+    def get_obj_lines(self, fd, containerId, object_type):
+        """read lines, get obj, return obj list"""
         logger = logging.getLogger()
-        id_pattern = re.compile(r"\d+$")
-        id_match = id_pattern.match(object_ident)
-        logger.info("id Match result: %s", id_match)
-        if id_match:  # an id
-            obj = conn.do("getEntityById", id=object_ident)
-        else:  # not an id
-            ip_pattern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($|[^\d])")
-            ip_match = ip_pattern.match(object_ident)
-            logger.info("IP Match result: '%s'", ip_match)
-            if ip_match:  # an IP
-                logger.info(
-                    "IP Match: '%s' and '%s'", ip_match.group(1), ip_match.group(2)
-                )
-                object_ident = ip_match.group(1)
-                if not rangetype:
-                    if ip_match.group(2) == "-":
-                        rangetype = "DHCP4Range"
-                    # "/" matches either IP4Block or IP4Network
-                if rangetype == "IP4Address":
-                    obj = conn.do(
-                        "getIP4Address",
-                        method="get",
-                        containerId=containerId,
-                        address=object_ident,
-                    )
+        obj_list = []
+        for line in fd:
+            if line.strip() != "":
+                obj, object_type = self.get_obj(line.strip(), containerId, object_type)
+                logger.info("get_obj_lines got obj %s, ", obj)
+                if obj and (object_type == "fqdn" or obj["id"]):
+                    obj_list.append(obj)
                 else:
-                    obj = self.get_range(conn, object_ident, containerId, rangetype)
-            else:  # not and IP or id
-                obj = None
-        logger.info("get_obj returns %s of type %s", obj, rangetype)
+                    print("not found", line)
+        return obj_list
+
+    def match_type(self, object_ident):
+        """uses pattern matching, finds type as
+        id, MACAddress, IP4Address, CIDR, IP4Range, fqdn, or None
+        where CIDR could be IP4Block or IP4Network,
+        and None could be a filename or other, or an error,
+        id returns ("id", None, None)
+        MAC returns ("MACAddress", None, None)
+        IP returns ("IP4Address", ip, None)
+        CIDR returns ("CIDR", start, prefix)
+        IP4Range returns ("IP4Range", start, end)
+        fqdn returns ("fqdn", None, None)
+        None return (None, None, None)
+        """
+        logger = logging.getLogger()
+        part1 = None
+        part2 = None
+        id_match = self.id_pattern.match(object_ident)
+        if id_match:
+            obj_type = "id"
+        else:
+            mac_match = self.mac_pattern.match(object_ident)
+            if mac_match:
+                obj_type = "MACAddress"
+            else:
+                ip_match = self.ip_pattern.match(object_ident)
+                if ip_match and ip_match.group("start"):
+                    part1 = ip_match.group("start")
+                    if ip_match.group("prefix"):
+                        obj_type = "CIDR"  # IP4Block or IP4Network
+                        part2 = ip_match.group("prefix")
+                    elif ip_match.group("end"):
+                        obj_type = "DHCP4Range"
+                        part2 = ip_match.group("end")
+                    else:
+                        obj_type = "IP4Address"
+                else:
+                    fqdn_match = self.fqdn_pattern.match(object_ident)
+                    if fqdn_match:
+                        obj_type = "fqdn"
+                    else:
+                        obj_type = None
+        logger.info("matched type: %s, part1 %s, part2 %s", obj_type, part1, part2)
+        return obj_type, part1, part2
+
+    # pylint: disable=R0912
+    def get_obj(self, object_ident, containerId, object_type, warn=True):
+        """get an object, given an id, IP, CIDR, or range,
+        return object and type matched"""
+        logger = logging.getLogger()
+        logger.info(
+            "get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
+            object_ident,
+            containerId,
+            json.dumps(object_type),
+            warn,
+        )
+        obj_type, part1, part2 = self.match_type(object_ident)
+        if object_type is None:
+            object_type = ""  # standardize the value
+        obj = None
+        if obj_type == "id":
+            obj = self.do("getEntityById", id=object_ident)
+        elif obj_type == "MACAddress":
+            obj = self.do(
+                "getMACAddress",
+                method="get",
+                configurationId=containerId,
+                macAddress=object_ident,
+            )
+        elif obj_type == "IP4Address":
+            obj = self.do(
+                "getIP4Address",
+                method="get",
+                containerId=containerId,
+                address=object_ident,
+            )
+        elif obj_type == "CIDR":
+            obj = self.get_range(part1, containerId, object_type)
+            if not obj or not obj.get("id"):
+                return None, None
+            obj_ip, obj_prefix = obj["properties"]["CIDR"].split("/")
+            logger.info("CIDR obj_ip %s,obj_prefix %s,obj %s", obj_ip, obj_prefix, obj)
+            while obj_ip == part1 and obj_prefix > part2:
+                obj = self.do("getParent", entityId=obj["id"])
+                obj_ip, obj_prefix = obj["properties"]["CIDR"].split("/")
+                logger.info(
+                    "CIDR parent obj_ip %s,obj_prefix %s,obj %s",
+                    obj_ip,
+                    obj_prefix,
+                    obj,
+                )
+            if obj and obj["id"]:
+                obj_type = obj["type"]
+                incidr = part1 + "/" + part2
+                if obj["properties"]["CIDR"] != incidr:
+                    print("CIDR input %s did not match CIDR in %s" % (incidr, obj))
+                    obj = None
+            else:
+                print("cidr not found: %s" % (object_ident))
+        elif obj_type == "IP4Range":
+            obj = self.get_range(part1, containerId, object_type)
+            if obj and obj["id"]:
+                obj_type = obj["type"]
+            else:
+                print("IP4Range not found: %s" % (object_ident))
+        elif obj_type == "fqdn":
+            # just return the fqdn, because it can resolve to multiple objects
+            obj = object_ident
+            # obj = self.get_fqdn(object_ident, containerId, object_type)
+        elif obj_type is None:
+            pass
+        else:
+            print("answer from match_type not recognized", obj_type, part1, part2)
+        logger.info("get_obj returns %s of type %s", obj, obj_type)
         if not obj and warn:
             print("Warning - no object found for:", object_ident, file=sys.stderr)
-        return obj
+        return obj, obj_type
 
-    @staticmethod
-    def get_range(conn, address, containerId, rangetype):
+    def get_range(self, address, containerId, object_type):
         """get range - block, network, or dhcp range - by IPv4 or IPv6"""
         logger = logging.getLogger()
-        logger.info("get_range: %s", address)
-        obj = conn.do(
-            "getIPRangedByIP", address=address, containerId=containerId, type=rangetype
+        logger.info(
+            "get_range for address: %s, containerId %s, object_type %s",
+            address,
+            containerId,
+            json.dumps(object_type),
         )
-        obj_id = obj["id"]
-        cidr = obj["properties"].get("CIDR")
-        start = obj["properties"].get("start")
-
+        if object_type is None:
+            object_type = ""  # standardize the value
+        obj = self.do(
+            "getIPRangedByIP",
+            address=address,
+            containerId=containerId,
+            type=object_type,
+        )
+        if obj:
+            obj_id = obj.get("id")
+            if obj_id:
+                cidr = obj["properties"].get("CIDR")
+                start = obj["properties"].get("start")
         logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
         if obj_id == 0:
             obj = None
@@ -558,8 +692,8 @@ class BAM(requests.Session):  # pylint: disable=R0902
                 # bug in BlueCat - if Block and Network have the same CIDR,
                 # it should return the Network, but it returns the Block.
                 # So check for a matching Network.
-                if rangetype == "" and obj["type"] == "IP4Block":
-                    network_obj = conn.do(
+                if object_type == "" and obj["type"] == "IP4Block":
+                    network_obj = self.do(
                         "getEntityByCIDR",
                         method="get",
                         cidr=cidr,
@@ -571,11 +705,17 @@ class BAM(requests.Session):  # pylint: disable=R0902
                         logger.info("IP4Network found: %s", obj)
         return obj
 
-    @staticmethod
-    def getinterface(server_name, configuration_id, conn):
+    def getinterface(self, server_name, configuration_id):
         """get server interface object, given the server name or interface name"""
+        _, interface_obj = self.getserver(server_name, configuration_id)
+        return interface_obj
+
+    def getserverbyinterfacename(self, server_name, configuration_id):
+        """search by server name, short or long, divided at dots"""
+        # server_obj, interface_obj = conn.getserver(server_name, configuration_id)
+        # assume <= 1000 servers defined  ****
         logger = logging.getLogger()
-        interface_obj_list = conn.do(
+        interface_obj_list = self.do(
             "searchByObjectTypes",
             keyword=server_name,
             types="NetworkServerInterface",
@@ -592,25 +732,25 @@ class BAM(requests.Session):  # pylint: disable=R0902
                 logger.info("%s did not match %s", server_name, interface["name"])
                 continue
             # check which Configuration
-            server_obj = conn.do("getParent", entityId=interface["id"])
-            server_configuration = conn.do("getParent", entityId=server_obj["id"])
+            server_obj = self.do("getParent", entityId=interface["id"])
+            server_configuration = self.do("getParent", entityId=server_obj["id"])
             if server_configuration["id"] == configuration_id:
                 interface_ok_list.append(interface)
         if len(interface_ok_list) > 1:
-            print(
-                "ERROR - more than one interface found:"
-                # , json.dumps(interface_ok_list)
-            )
-            for interface in interface_obj_list:
+            print("ERROR - more than one interface found:")
+            for interface in interface_ok_list:
                 print(interface["name"])
-            return None
+            return None, None
         if interface_ok_list:
             interfaceid = interface_ok_list[0]["id"]
             if interfaceid != 0:
-                return interface_ok_list[0]
+                return server_obj, interface_ok_list[0]
+        return None, None
 
+    def getserverbyservername(self, server_name, configuration_id):
+        """get server by servername"""
         # try another method, in case they gave the server display name instead
-        server_obj_list = conn.do(
+        server_obj_list = self.do(
             "getEntitiesByNameUsingOptions",
             parentId=configuration_id,
             name=server_name,
@@ -620,42 +760,52 @@ class BAM(requests.Session):  # pylint: disable=R0902
             count=2,  # error if more than one
         )
         # print(json.dumps(server_obj_list))
+        if len(server_obj_list) == 1:
+            server_id = server_obj_list[0]["id"]
+            if server_id != 0:
+                interface_obj_list = self.do(
+                    "getEntities",
+                    method="get",
+                    parentId=server_id,
+                    type="NetworkServerInterface",
+                    start=0,
+                    count=1000,
+                )
+                if len(interface_obj_list) == 1:
+                    interfaceid = interface_obj_list[0]["id"]
+                    if interfaceid != 0:
+                        return server_obj_list[0], interface_obj_list[0]
+                if len(interface_obj_list) > 1:
+                    print(
+                        "ERROR - more than one interface found",
+                        json.dumps(interface_obj_list),
+                    )
         if len(server_obj_list) > 1:
             print(
                 "ERROR - found more than one server for name",
                 server_name,
                 json.dumps(server_obj_list),
             )
-            sys.exit(1)
-        if len(server_obj_list) < 1:
-            print("ERROR - server not found for", server_name)
-            sys.exit(1)
-        server_id = server_obj_list[0]["id"]
-        if server_id == 0:
-            print("ERROR - server not found for name", server_name)
-            sys.exit(1)
+        return None, None
 
-        interface_obj_list = conn.do(
-            "getEntities",
-            method="get",
-            parentId=server_id,
-            type="NetworkServerInterface",
-            start=0,
-            count=1000,
+    def getserver(self, server_name, configuration_id):
+        """return server and interface objects"""
+        # server_obj, interface_obj = conn.getserver(server_name, configuration_id)
+
+        server_obj, interface_obj = self.getserverbyinterfacename(
+            server_name, configuration_id
         )
-        if len(interface_obj_list) > 1:
-            print(
-                "ERROR - more than one interface found", json.dumps(interface_obj_list)
+        if not server_obj:
+            server_obj, interface_obj = self.getserverbyservername(
+                server_name, configuration_id
             )
-            return None
-        interfaceid = interface_obj_list[0]["id"]
-        if interfaceid == 0:
-            print("ERROR - interface not found")
-            return None
-        return interface_obj_list[0]
+        if not server_obj:
+            print("ERROR - server or interface not found for", server_name)
+        return server_obj, interface_obj
 
-    def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
-        """get list of entities with given fqdn and type"""
+    def get_zone(self, domain_name, view_id):
+        """find closest zone for domain_name,
+        return zone_obj,remainder (possibly dotted name)"""
         logger = logging.getLogger()
         domain_label_list = domain_name.split(".")
         logger.info(domain_label_list)
@@ -664,25 +814,29 @@ class BAM(requests.Session):  # pylint: disable=R0902
         search_domain = ".".join(domain_label_list[zone_start:zone_end])
         current_domain = ""
         parent_id = view_id
+        found_zone_obj = None
 
         while True:
-            logger.info("%s %s %s", zone_start, zone_end, search_domain)
-            zone = self.do(
+            logger.info(
+                "start: %s, end: %s, search: %s", zone_start, zone_end, search_domain
+            )
+            zone_obj = self.do(
                 "getEntityByName",
                 method="get",
                 parentId=parent_id,
                 name=search_domain,
                 type="Zone",
             )
-            if zone.get("id") == 0:  # try same parent, dotted name
+            if zone_obj.get("id") == 0:  # try same parent, dotted name
                 if zone_start > 0:
                     zone_start -= 1  # decrement by one
                     search_domain = ".".join(domain_label_list[zone_start:zone_end])
                     continue
                 break
-            parent_id = zone.get("id")
+            found_zone_obj = zone_obj
+            parent_id = zone_obj.get("id")
             current_domain = ".".join(domain_label_list[zone_start:])
-            logger.info("%s %s", zone, current_domain)
+            logger.info("current_domain: %s, zone: %s", current_domain, zone_obj)
             if zone_start != 0:
                 zone_end = zone_start
                 zone_start -= 1
@@ -690,18 +844,227 @@ class BAM(requests.Session):  # pylint: disable=R0902
             else:
                 search_domain = ""
                 break
+        remainder = ".".join(domain_label_list[0:zone_end])
+        logger.info("remainder: %s", remainder)
+        return found_zone_obj, remainder
 
+    def get_fqdn(self, domain_name, view_id, record_type="HostRecord"):
+        """get list of entities with given fqdn and type"""
+        logger = logging.getLogger()
+        zone_obj, remainder = self.get_zone(domain_name, view_id)
         if record_type.lower() == "zone":
-            entities = [zone]
+            entities = [zone_obj]
         else:
             entities = self.do(
                 "getEntitiesByNameUsingOptions",
                 method="get",
-                parentId=parent_id,
-                name=search_domain,
+                parentId=zone_obj["id"],
+                name=remainder,
                 type=record_type,
                 options="ignoreCase=true",
                 start=0,
                 count=1000,
             )
+        logger.info("entities: %s", entities)
         return entities
+
+    def delete_ip_obj(self, ip_obj):
+        """delete ip obj, handle case of DHCP_ALLOCATED"""
+        ip_id = ip_obj["id"]
+        if ip_obj["properties"]["state"] == "DHCP_ALLOCATED":
+            # change to dhcp reserved with a fake mac address, then delete
+            # use random self-assigned mac address like fedcba987654
+            # in case the existing mac already has a dhcp reserved entry
+            result = self.do(
+                "changeStateIP4Address",
+                addressId=ip_id,
+                targetState="MAKE_DHCP_RESERVED",
+                macAddress="fedcba987654",
+            )
+            if result:
+                return result
+        result = self.do(
+            "deleteWithOptions",
+            method="delete",
+            objectId=ip_id,
+            options="noServerUpdate=true|deleteOrphanedIPAddresses=true|",
+        )
+        return result
+
+    def get_dhcp_ranges(self, networkid):
+        """get list of ranges"""
+        logger = logging.getLogger()
+        range_list = self.get_bam_api_list(
+            "getEntities",
+            parentId=networkid,
+            type="DHCP4Range",
+        )
+        logger.debug(range_list)
+        return range_list
+
+    @staticmethod
+    def make_dhcp_ranges_list(range_list):
+        """return sorted list of dict with the start and end ipaddress class IP objects
+        and the BlueCat range object, like:
+        [
+            { "start": start_ip_obj, "end": end_ip_obj, "range": range_obj }
+            ...
+        ]"""
+        logger = logging.getLogger()
+        range_info_list = []
+        for dhcp_range in range_list:
+            start = ipaddress.ip_address(dhcp_range["properties"]["start"])
+            end = ipaddress.ip_address(dhcp_range["properties"]["end"])
+            range_info_list.append({"start": start, "end": end, "range": dhcp_range})
+        logger.info(range_info_list)
+        range_info_list.sort(key=lambda self: self["start"])
+        return range_info_list
+
+    def getparentview(self, entity_id):
+        """walk tree up to view, with cache"""
+        view_id = self.parentviewcache.get("id")
+        if view_id:
+            return view_id
+        parent = self.do("getParent", entityId=entity_id)
+        if parent == 0:
+            print("ERROR - got to top without finding a view for object id", entity_id)
+            return None
+        entity_type = parent["type"]
+        if entity_type == "View":
+            view_id = parent["id"]
+            self.parentviewcache[entity_id] = view_id
+            return view_id
+        return self.getparentview(parent["id"])  # recursive
+
+    def get_ip_list(self, networkid, states=None):
+        """returns [filtered] list of IP entities, given a network id
+        and optional list of states"""
+        ip_list = self.get_bam_api_list(
+            "getEntities",
+            parentId=networkid,
+            type="IP4Address",
+        )
+        if states:
+            ip_list = [ip for ip in ip_list if ip["properties"]["state"] in states]
+        return ip_list
+
+    @staticmethod
+    def make_ip_dict(ip_list):
+        """convert ip_list to dict: {ipaddress_class_obj: ip_entity}"""
+        ip_dict = {
+            ipaddress.ip_address(ip_obj["properties"]["address"]): ip_obj
+            for ip_obj in ip_list
+        }
+        return ip_dict
+
+    def get_shared_network_tag_by_name(self, name, configuration_id):
+        """get shared network tag by name, in configuration"""
+        logger = logging.getLogger()
+        cfg_obj = self.do("getEntityById", id=configuration_id)
+        shared_net_group_id = int(cfg_obj["properties"]["sharedNetwork"])
+        # search for name
+        obj_list = self.get_bam_api_list(
+            "searchByObjectTypes",
+            keyword=name,
+            types="Tag,TagGroup",
+        )
+        found = None  # define in this scope
+        for obj in obj_list:
+            # verify exact name match (not partial)
+            if obj["name"] == name:
+                # verify that it is a shared_network tag for this configuration
+                group = self.find_parent_of_type(obj["id"], "TagGroup")
+                logger.info(
+                    "compare %s to %s",
+                    json.dumps(group["id"]),
+                    json.dumps(shared_net_group_id),
+                )
+                if group["id"] == shared_net_group_id:
+                    found = obj
+                    logger.info("found %s", found)
+        return found
+
+    def find_parent_of_type(self, obj_id, obj_type):
+        """search up tree for parent with the given type,
+        like finding the group for a tag,
+        or the configuration for a network,
+        or the view for a zone or record,
+        returns parent object"""
+        logger = logging.getLogger()
+        myid = obj_id
+        mytype = None
+        parent_obj = None  # make it in this scope
+        while mytype != obj_type and myid != 0:
+            parent_obj = self.do("getParent", entityId=myid)
+            mytype = parent_obj["type"]
+            myid = parent_obj["id"]
+            logger.info("id: %s, name: %s, type: %s", myid, parent_obj["name"], mytype)
+        if myid == 0:
+            return None
+        return parent_obj
+
+
+class DhcpRangeList(list):  # pylint: disable=R0902
+    """make a dhcp range list object, with function to check if in range,
+    list must be in format from make_dhcp_ranges_list"""
+
+    def __init__(
+        self,
+        dhcp_ranges_list,  # sorted list with start/end from make_dhcp_ranges_list
+        network_obj,
+    ):
+        """DHCP range list, with extra functions"""
+        list.__init__(self, BAM.make_dhcp_ranges_list(dhcp_ranges_list))
+        # save network, range list, and current range
+        self.network_obj = network_obj
+        self.ranges = dhcp_ranges_list
+        self.range_num = 0
+        # calculate network start/end
+        self.cidr = network_obj["properties"]["CIDR"]
+        self.network_net = ipaddress.IPv4Network(self.cidr)
+        self.network_ip = self.network_net.network_address
+        self.broadcast_ip = self.network_net.broadcast_address
+        # start with gap from network_ip to before first range
+        self.gap = self.network_ip
+        if self.__len__() > 0:
+            # range list must be sorted
+            self.start = self[0]["start"]
+            self.end = self[0]["end"]
+        else:
+            # no range_size, put start after end so it never matches
+            self.start = self.broadcast_ip + 1
+            self.end = self.broadcast_ip
+
+    def in_range(self, ip):
+        """check if given IP is in any of the DHCP ranges"""
+        # NOT TESTED AND NOT USED ANYWHERE YET
+        # note that this is most efficient if IP's are checked in ascending order
+        # by checking the range that the last IP was in first
+        if ip < self.gap:
+            # restart range search
+            self.range_num = 0
+            self.gap = self.network_ip
+        elif ip < self.start:
+            return False
+        elif ip < self.end:
+            return True
+        else:
+            self.gap = self[self.range_num]["end"] + 1
+            self.range_num += 1
+        # outside network?
+        if ip < self.network_ip or ip > self.broadcast_ip:
+            return False
+        # search ranges
+        self.start = self[self.range_num]["start"]
+        self.end = self[self.range_num]["end"]
+        while self.range_num < len(self):
+            if ip <= self.end:
+                if ip >= self.start:
+                    return True
+                return False
+            # move to next range
+            self.gap = self[self.range_num]["end"] + 1
+            self.range_num += 1
+            self.start = self[self.range_num]["start"]
+            self.end = self[self.range_num]["end"]
+        return False

@@ -11,7 +11,6 @@ delete_lease_time.py entity
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 
@@ -20,54 +19,6 @@ import bluecat_bam
 
 __progname__ = "delete_lease_time"
 __version__ = "0.1"
-
-
-def getserverid(server_name, configuration_id, conn):
-    """get server id, given the server domainname or displayname"""
-    # try by the server domainname
-    interface_obj_list = conn.do(
-        "searchByObjectTypes",
-        keyword=server_name,
-        types="NetworkServerInterface",
-        start=0,
-        count=2,  # error if more than one
-    )
-    if len(interface_obj_list) > 1:
-        print(
-            "ERROR - more than one server interface found",
-            json.dumps(interface_obj_list),
-        )
-        sys.exit(3)
-    interfaceid = interface_obj_list[0]["id"]
-    if interfaceid != 0:
-        obj = conn.do("getParent", entityId=interfaceid)
-        return obj["id"]
-    # server not found by domanname
-    # try by the server display name
-    server_obj_list = conn.do(
-        "getEntitiesByName",
-        parentId=configuration_id,
-        name=server_name,
-        type="Server",
-        start=0,
-        count=2,  # error if more than one
-    )
-    # print(json.dumps(server_obj_list))
-    if len(server_obj_list) > 1:
-        print(
-            "ERROR - found more than one server for name",
-            server_name,
-            json.dumps(server_obj_list),
-        )
-        sys.exit(1)
-    if len(server_obj_list) < 1:
-        print("ERROR - server not found for", server_name)
-        sys.exit(1)
-    server_id = server_obj_list[0]["id"]
-    if server_id == 0:
-        print("ERROR - server not found for name", server_name)
-        sys.exit(1)
-    return server_id
 
 
 def getfield(obj, fieldname):
@@ -125,10 +76,11 @@ def main():
 
         dhcpserver_id = 0
         if args.dhcpserver:
-            dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
+            server_obj, _ = conn.getserver(args.dhcpserver, configuration_id)
+            dhcpserver_id = server_obj["id"]
 
         object_ident = args.object_ident
-        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        entity_list = conn.get_obj_list(object_ident, configuration_id, args.type)
         logger.info(entity_list)
 
         for entity in entity_list:
@@ -154,46 +106,42 @@ def main():
                     serverId=dhcpserver_id,
                 )
                 logger.info(json.dumps(option))
-                if option.get("id") == 0:
+                if not option.get("id"):
                     print("no option", opt_name, "at this level, cannot delete")
                 else:
-                    objtype = getfield(option, "type")
-                    name = getfield(option, "name")
-                    value = getfield(option, "value")
-                    inherited = getprop(option, "inherited")
                     print(
-                        "    deleting deployment option:",
-                        objtype,
-                        name,
-                        value,
-                        inherited,
+                        "    deleting %s: type %s,\tname %s,\tvalue %s,\tinherited %s"
+                        % (
+                            "deployment option",
+                            option["type"],
+                            option["name"],
+                            option["value"],
+                            option["properties"]["inherited"],
+                        )
                     )
                     result = conn.do("delete", objectId=option["id"])
                     if result:
                         print("result: ", result)
 
-            options = conn.do(
-                "getDeploymentOptions",
-                entityId=entity_id,
-                optionTypes="DHCPServiceOption",
-                serverId=-1,
-            )
-            logger.info(json.dumps(options))
-            printoptions(options, optionlist)
-
-
-def printoptions(options, optionlist):
-    """print options"""
-    print("Options are now:")
-    for option in options:
-        if optionlist and option.get("name") not in optionlist:
-            continue
-        opt_id = getfield(option, "id")
-        objtype = getfield(option, "type")
-        name = getfield(option, "name")
-        value = getfield(option, "value")
-        inherited = getprop(option, "inherited")
-        print("    ", opt_id, objtype, name, value, inherited)
+            for opt_name in optionlist:
+                option = conn.do(
+                    "getDHCPServiceDeploymentOption",
+                    entityId=entity_id,
+                    name=opt_name,
+                    serverId=dhcpserver_id,
+                )
+                logger.info(json.dumps(option))
+                if option.get("id"):
+                    print(
+                        "    id %s,\ttype %s,\tname %s,\tvalue %s,\tinherited %s"
+                        % (
+                            option["id"],
+                            option["type"],
+                            option["name"],
+                            option["value"],
+                            option["properites"]["inherited"],
+                        )
+                    )
 
 
 if __name__ == "__main__":

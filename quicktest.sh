@@ -12,7 +12,7 @@ pylint $files || exit 1
 echo "================= flake8 ================"
 flake8 $files || exit 1
 echo "================= bandit ================"
-bandit $files || exit 1
+bandit -s B101 -r $files || exit 1
 echo "================= pytest ================"
 pytest || exit 1
 #)

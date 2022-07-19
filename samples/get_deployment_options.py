@@ -65,7 +65,7 @@ def main():
         configuration_id = configuration_obj["id"]
         logger.info(json.dumps(configuration_obj))
 
-        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         logger.info("obj_list: %s", obj_list)
 
         for obj in obj_list:
@@ -98,10 +98,9 @@ def get_deployment_option(conn, args, obj):
     cidr = getprop(obj, "CIDR")
     start = getprop(obj, "start")
     end = getprop(obj, "end")
-    print("For entity: ", objtype, name, cidr, start, end)
+    print("For entity: ", objtype, name, cidr, start, end, "Options:")
     # print(obj)
 
-    print("    Options:")
     options = conn.do(
         "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
     )
@@ -116,6 +115,7 @@ def get_deployment_option(conn, args, obj):
         inherited = getprop(option, "inherited")
         print("    ", opt_id, objtype, name, value, inherited)
         # print(json.dumps(option))
+    print()  # blank line after each set of lines
 
 
 if __name__ == "__main__":

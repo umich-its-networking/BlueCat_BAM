@@ -1,2 +1,2 @@
 """package bluecat_bam"""
-from bluecat_bam.api import BAM  # noqa: F401
+from bluecat_bam.api import BAM, DhcpRangeList  # noqa: F401

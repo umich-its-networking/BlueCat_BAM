@@ -11,7 +11,6 @@ get_lease_time.py entity
 # to be python2/3 compatible:
 from __future__ import print_function
 
-import sys
 import json
 import logging
 
@@ -20,54 +19,6 @@ import bluecat_bam
 
 __progname__ = "get_lease_time"
 __version__ = "0.1"
-
-
-def getserverid(server_name, configuration_id, conn):
-    """get server id, given the server domainname or displayname"""
-    # try by the server domainname
-    interface_obj_list = conn.do(
-        "searchByObjectTypes",
-        keyword=server_name,
-        types="NetworkServerInterface",
-        start=0,
-        count=2,  # error if more than one
-    )
-    if len(interface_obj_list) > 1:
-        print(
-            "ERROR - more than one server interface found",
-            json.dumps(interface_obj_list),
-        )
-        sys.exit(3)
-    interfaceid = interface_obj_list[0]["id"]
-    if interfaceid != 0:
-        obj = conn.do("getParent", entityId=interfaceid)
-        return obj["id"]
-    # server not found by domanname
-    # try by the server display name
-    server_obj_list = conn.do(
-        "getEntitiesByName",
-        parentId=configuration_id,
-        name=server_name,
-        type="Server",
-        start=0,
-        count=2,  # error if more than one
-    )
-    # print(json.dumps(server_obj_list))
-    if len(server_obj_list) > 1:
-        print(
-            "ERROR - found more than one server for name",
-            server_name,
-            json.dumps(server_obj_list),
-        )
-        sys.exit(1)
-    if len(server_obj_list) < 1:
-        print("ERROR - server not found for", server_name)
-        sys.exit(1)
-    server_id = server_obj_list[0]["id"]
-    if server_id == 0:
-        print("ERROR - server not found for name", server_name)
-        sys.exit(1)
-    return server_id
 
 
 def getfield(obj, fieldname):
@@ -89,7 +40,9 @@ def main():
     """
     get_lease_time.py entityId
     """
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Get lease times (min, default, max) for Network(s)"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -123,15 +76,13 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        prop = {}
-        dhcpserver_id = 0
+        dhcpserver_id = -1  # -1 shows all
         if args.dhcpserver:
-            dhcpserver_id = getserverid(args.dhcpserver, configuration_id, conn)
-            prop["server"] = dhcpserver_id
-        # print(prop)
+            server_obj, _ = conn.getserver(args.dhcpserver, configuration_id)
+            dhcpserver_id = server_obj["id"]
 
         object_ident = args.object_ident
-        entity_list = conn.get_obj_list(conn, object_ident, configuration_id, args.type)
+        entity_list = conn.get_obj_list(object_ident, configuration_id, args.type)
         logger.info(entity_list)
 
         for entity in entity_list:
@@ -139,33 +90,36 @@ def main():
             objtype = getfield(entity, "type")
             name = getfield(entity, "name")
 
-            print(
-                "For entity: ",
-                objtype,
-                name,
-                getprop(entity, "CIDR"),
-                getprop(entity, "start"),
-                getprop(entity, "end"),
-            )
+            if entity["properties"].get("CIDR"):
+                print(
+                    objtype,
+                    name,
+                    getprop(entity, "CIDR"),
+                )
+            else:
+                print(
+                    objtype,
+                    name,
+                    getprop(entity, "start"),
+                    getprop(entity, "end"),
+                    "Options:",
+                )
 
             optionlist = ["default-lease-time", "max-lease-time", "min-lease-time"]
             options = conn.do(
                 "getDeploymentOptions",
                 entityId=entity_id,
                 optionTypes="DHCPServiceOption",
-                serverId=-1,
+                serverId=dhcpserver_id,
             )
             logger.info(json.dumps(options))
-            print("Options are now:")
             for option in options:
                 if optionlist and option.get("name") not in optionlist:
                     continue
-                opt_id = getfield(option, "id")
-                objtype = getfield(option, "type")
-                name = getfield(option, "name")
-                value = getfield(option, "value")
+                name = option["name"]
+                value = option["value"]
                 inherited = getprop(option, "inherited")
-                print("    ", opt_id, objtype, name, value, inherited)
+                print("    %18s %s   %s" % (name, value, inherited))
 
 
 if __name__ == "__main__":

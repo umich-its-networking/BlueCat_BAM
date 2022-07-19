@@ -43,7 +43,7 @@ config.add_argument(
     help="BlueCat Configuration name",
     default=os.getenv("BLUECAT_CONFIGURATION"),
 )
-config.add_argument("--parent_id", help="Id of parent Configuration or Block")
+config.add_argument("parent_id", help="Id of parent Configuration or Block")
 config.add_argument(
     "--logging",
     "-l",
@@ -104,6 +104,7 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
             break
 
     # print("results")
+    print('CIDR shared-network id vlanid "name"')
     for network_obj in network_list:
         # print('network_obj',json.dumps(network_obj))
         print(

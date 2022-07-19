@@ -12,7 +12,9 @@ import logging
 import bluecat_bam
 
 
-config = bluecat_bam.BAM.argparsecommon()
+config = bluecat_bam.BAM.argparsecommon(
+    "restore data on prod from a test server, not for normal use"
+)
 config.add_argument("--type", help="DNS record type", default="HostRecord")
 config.add_argument(
     "--host", "--hostname", "--fqdn", "--dns", "-d", help="DNS domain name or hostname"

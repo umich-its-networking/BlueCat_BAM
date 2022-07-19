@@ -12,15 +12,14 @@ Just type:
  ./bam.py getEntities 13098279 HostRecord
 
 Option to save and reuse the login token across multiple calls
-More automated tests
+Unit tests
 More error checking and more specific error messages
 More debug options
 Read text or json input from stdin and use the appropriate values as argument "-"
 like:
 bam.py getEntityByName 0 'Main' Configuration | bam.py getEntityByName - 'Default' View
 
-Config file for server, user, and password
-Get defaults for Configuration and View from config file
+Optional config file for server, user, and password (as an alternate to environment vars)
 
 Recognize IP and MAC Addresses in various formats
 Allow arguments that are id's to optionally be names, and convert automatically
@@ -30,3 +29,11 @@ Add common tasks that map to several API calls, like getting a DNS record by FQD
 
 Sort dictionary items so that output is in a consistent order,
 either alphabetically, or in an order that makes sense for BlueCat entities.
+
+Technical improvements:
+Convert from Gitlab to Github
+Publish to pypi.org
+Update the sample scripts to the latest format that I have evolved to.
+Rearrange the file structure
+Split up the api.py file
+Allow use without even having to install

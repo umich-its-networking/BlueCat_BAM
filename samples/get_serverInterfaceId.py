@@ -6,8 +6,6 @@
 from __future__ import print_function
 
 import os
-import sys
-import json
 import argparse
 import logging
 
@@ -16,65 +14,6 @@ import bluecat_bam
 
 __progname__ = "get_serverInterfaceId"
 __version__ = "0.1"
-
-
-def getinterfaceid(server_name, configuration_id, conn):
-    """get server interface id, given the server domainname or displayname"""
-    interface_obj_list = conn.do(
-        "searchByObjectTypes",
-        keyword=server_name,
-        types="NetworkServerInterface",
-        start=0,
-        count=2,  # error if more than one
-    )
-    if len(interface_obj_list) > 1:
-        print("ERROR - more than one interface found", json.dumps(interface_obj_list))
-        sys.exit(3)
-    interface_id = interface_obj_list[0]["id"]
-    if interface_id != 0:
-        return interface_id
-
-    # try another method, in case they gave the server display name instead
-    server_obj_list = conn.do(
-        "getEntitiesByName",
-        parentId=configuration_id,
-        name=server_name,
-        type="Server",
-        start=0,
-        count=2,  # error if more than one
-    )
-    # print(json.dumps(server_obj_list))
-    if len(server_obj_list) > 1:
-        print(
-            "ERROR - found more than one server for name",
-            server_name,
-            json.dumps(server_obj_list),
-        )
-        sys.exit(1)
-    if len(server_obj_list) < 1:
-        print("ERROR - server not found for", server_name)
-        sys.exit(1)
-    server_id = server_obj_list[0]["id"]
-    if server_id == 0:
-        print("ERROR - server not found for name", server_name)
-        sys.exit(1)
-
-    interface_obj_list = conn.do(
-        "getEntities",
-        method="get",
-        parentId=server_id,
-        type="NetworkServerInterface",
-        start=0,
-        count=1000,
-    )
-    if len(interface_obj_list) > 1:
-        print("ERROR - more than one interface found", json.dumps(interface_obj_list))
-        sys.exit(3)
-    interface_id = interface_obj_list[0]["id"]
-    if interface_id == 0:
-        print("ERROR - interface not found")
-        sys.exit(4)
-    return interface_id
 
 
 def main():
@@ -136,17 +75,14 @@ def main():
     server_name = args.bdds
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
-        configuration_obj = conn.do(
-            "getEntityByName",
-            method="get",
-            parentId=0,
-            name=args.configuration,
-            type="Configuration",
-        )
-        configuration_id = configuration_obj["id"]
+        (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        interface_id = getinterfaceid(server_name, configuration_id, conn)
-        print(interface_id)
+        interface = conn.getinterface(server_name, configuration_id)
+        if interface:
+            interface_id = interface["id"]
+            print(interface_id)
+        else:
+            print("ERROR - did not find interface for", server_name)
 
 
 if __name__ == "__main__":

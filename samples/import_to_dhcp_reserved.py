@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 
 """
-import_to_dhcp_reserved.py < output-from-arubaIntermapperSnmp
+import_to_dhcp_reserved.py object_ident inputfile
+inputfile format:  IP,MAC,name,fqdn
 """
 
 
 # to be python2/3 compatible:
 from __future__ import print_function
 
+import sys
 import logging
 import re
 import json
 import itertools
+import ipaddress
 
 import bluecat_bam
 
@@ -20,31 +23,13 @@ __progname__ = "import_to_dhcp_reserved"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_ip_list(networkid, conn):
     """get list of IP objects"""
     logger = logging.getLogger()
-    ip_list = get_bam_api_list(
-        conn, "getEntities", parentId=networkid, type="IP4Address", start=0, count=1000,
+    ip_list = conn.get_bam_api_list(
+        "getEntities",
+        parentId=networkid,
+        type="IP4Address",
     )
     logger.debug(ip_list)
     return ip_list
@@ -128,7 +113,7 @@ def canonical_mac(mac):
 
 def main():
     """import_to_dhcp_reserved.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon("Create DHCP Reserved from import list")
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -167,8 +152,16 @@ def main():
             args.configuration, args.view
         )
 
-        ip_dict = make_ip_dict(conn, args.object_ident, configuration_id)
-        logger.info("ip_dict %s", json.dumps(ip_dict))
+        network_list = conn.get_obj_list(args.object_ident, configuration_id, "")
+        logger.info("network_list: %s", json.dumps(network_list))
+        if len(network_list) > 1:
+            print("ERROR - cannot handle more than one network", file=sys.stderr)
+            raise ValueError
+        network_obj = network_list[0]
+
+        ip_list = get_ip_list(network_obj["id"], conn)
+        ip_dict = make_ip_dict(ip_list)
+        logger.info("ip_dict %s", ip_dict)
         counts = {
             "importonly": 0,
             "importnomac": 0,
@@ -184,6 +177,7 @@ def main():
         # "", "macAddress": ""}}
 
         # now read the data from csv file from controller
+        # inputfile format:  IP,MAC,name,fqdn
         line_pat = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})($| |\t|,)")
         with open(args.inputfile) as f:
             for line in f:
@@ -196,7 +190,7 @@ def main():
                 line_mac = canonical_mac(line_d["mac"])
 
                 # get BlueCat info
-                ip_obj = ip_dict.get(line_d["ip"])
+                ip_obj = ip_dict.get(ipaddress.ip_address(line_d["ip"]))
                 if not ip_obj:
                     obj_mac = None
                     obj_state = None
@@ -362,18 +356,12 @@ def parse_line(line, line_pat):
     return line_d
 
 
-def make_ip_dict(conn, object_ident, configuration_id):
-    """make ip dict"""
-    logger = logging.getLogger()
-    obj_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
-    logger.info("obj_list: %s", json.dumps(obj_list))
+def make_ip_dict(ip_list):
+    """get IP objects in network and put iin dict with Python ipaddress obj as key"""
     ip_dict = {}
-    for entity in obj_list:
-        entityId = entity["id"]
-        matching_list = get_ip_list(entityId, conn)
-        for ip in matching_list:
-            ip_address = ip["properties"]["address"]
-            ip_dict[ip_address] = ip
+    for ip_obj in ip_list:
+        ip_address = ipaddress.ip_address(ip_obj["properties"]["address"])
+        ip_dict[ip_address] = ip_obj
     return ip_dict
 
 

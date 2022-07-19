@@ -18,63 +18,16 @@ __progname__ = "count_states_by_network"
 __version__ = "0.1"
 
 
-def get_bam_api_list(conn, apiname, **kwargs):
-    """wrap api call with loop to handle 'start' and 'count'"""
-    if not kwargs["count"]:
-        kwargs["count"] = 1000
-    if not kwargs["start"]:
-        kwargs["start"] = 0
-    count = kwargs["count"]
-    replysize = count
-    listall = []
-    start = 0
-    while replysize == count:
-        kwargs["start"] = start
-        listone = conn.do(apiname, **kwargs)
-        replysize = len(listone)
-        start += replysize
-        # print(replysize)
-        listall.extend(listone)
-    return listall
-
-
 def get_ip_list(networkid, conn):
     """get list of IP objects"""
     logger = logging.getLogger()
-    ip_list = get_bam_api_list(
-        conn, "getEntities", parentId=networkid, type="IP4Address", start=0, count=1000,
+    ip_list = conn.get_bam_api_list(
+        "getEntities",
+        parentId=networkid,
+        type="IP4Address",
     )
     logger.debug(ip_list)
     return ip_list
-
-
-def make_ip_dict(conn, object_ident, configuration_id):
-    """make ip dict"""
-    logger = logging.getLogger()
-    obj_list = conn.get_obj_list(conn, object_ident, configuration_id, "")
-    logger.info("obj_list: %s", obj_list)
-    ip_dict = {}
-    for entity in obj_list:
-        entityId = entity["id"]
-        matching_list = get_ip_list(entityId, conn)
-        for ip in matching_list:
-            ip_dict[ip["properties"]["address"]] = ip
-    return ip_dict
-
-
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + field + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
 
 
 def main():
@@ -94,7 +47,9 @@ def main():
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        network_obj_list = conn.get_obj_list(conn, args.network, configuration_id, "")
+        network_obj_list = conn.get_obj_list(
+            args.network, configuration_id, "IP4Network"
+        )
         logger.info("network_obj_list: %s", network_obj_list)
 
         # {"id": 17396816, "name": "MYPC-1450", "type": "IP4Address",
@@ -108,15 +63,17 @@ def main():
             for ip in ip_obj_list:
                 ip_dict[ip["properties"]["address"]] = ip
 
-            range_list = get_dhcp_ranges(networkid, conn)
-            range_info_list = get_dhcp_ranges_info(range_list)
+            range_list = conn.get_dhcp_ranges(networkid)
+            # print(range_list)
+            range_info_list = conn.make_dhcp_ranges_list(range_list)
+            # print(range_info_list)
 
             # print(network)
             cidr = network["properties"]["CIDR"]
             network_net = ipaddress.IPv4Network(cidr)
             netsize = ipaddress.IPv4Network(cidr).num_addresses
             print("%s size of Network: %s\t%s" % (netsize, network["name"], cidr))
-            print_dhcp_ranges(networkid, conn)
+            print_dhcp_ranges(range_info_list)
 
             (count_in, count_out) = count_network(network_net, range_info_list, ip_dict)
             print_counts(count_in, count_out)
@@ -125,19 +82,20 @@ def main():
 
 def print_counts(count_in, count_out):
     """print counts"""
-    print("in ranges:")
+    location = "inside ranges: "
     for state in sorted(count_in.keys()):
         count = count_in[state]
-        print(count, state)
-    print("outside ranges:")
+        print(location, count, state)
+    location = "outside ranges:"
     for state in sorted(count_out.keys()):
         count = count_out[state]
-        print(count, state)
+        print(location, count, state)
 
 
 def count_network(network_net, range_info_list, ip_dict):
     """count states in a network"""
     # in_range=False    # future - count in each range
+    # note that range_info_list is sorted
     i = 0
     (rangestart, rangeend) = get_info(i, range_info_list, network_net)
     count_in = {}  # in DHCP ranges
@@ -181,15 +139,14 @@ def get_info(i, range_info_list, network_net):
     return (rangestart, rangeend)
 
 
-def print_dhcp_ranges(networkid, conn):
+def print_dhcp_ranges(range_info_list):
     """print dhcp ranges"""
-    ranges_list = get_dhcp_ranges(networkid, conn)
-    for x in ranges_list:
-        start = ipaddress.ip_address(x["properties"]["start"])
-        end = ipaddress.ip_address(x["properties"]["end"])
+    for x in range_info_list:
+        start = ipaddress.ip_address(x["start"])
+        end = ipaddress.ip_address(x["end"])
         rangesize = int(end) - int(start) + 1
         print("%s size of DHCP_range: %s-%s" % (rangesize, start, end))
-    if not ranges_list:
+    if not range_info_list:
         print("    DHCP_range: none")
 
 
@@ -214,8 +171,10 @@ def get_dhcp_ranges_info(range_list):
 def get_dhcp_ranges(networkid, conn):
     """get list of ranges"""
     logger = logging.getLogger()
-    range_list = get_bam_api_list(
-        conn, "getEntities", parentId=networkid, type="DHCP4Range", start=0, count=1000,
+    range_list = conn.get_bam_api_list(
+        "getEntities",
+        parentId=networkid,
+        type="DHCP4Range",
     )
     logger.debug(range_list)
     return range_list

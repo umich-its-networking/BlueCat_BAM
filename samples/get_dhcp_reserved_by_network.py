@@ -55,7 +55,9 @@ def get_dhcp_reserved(networkid, conn, logger):
 
 def main():
     """get_dhcp_reserved_by_network.py"""
-    config = bluecat_bam.BAM.argparsecommon()
+    config = bluecat_bam.BAM.argparsecommon(
+        "Get list of all DHCP_RESERVED in a Network"
+    )
     config.add_argument(
         "object_ident",
         help="Can be: entityId (all digits), individual IP Address (n.n.n.n), "
@@ -83,7 +85,7 @@ def main():
         )
         configuration_id = configuration_obj["id"]
 
-        obj_list = conn.get_obj_list(conn, object_ident, configuration_id, rangetype)
+        obj_list = conn.get_obj_list(object_ident, configuration_id, rangetype)
         logger.info("obj_list: %s", obj_list)
 
         for entity in obj_list:
