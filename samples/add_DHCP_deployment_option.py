@@ -181,10 +181,7 @@ def main():
             logger.info(option_id)
 
             option = conn.do(
-                api2,
-                entityId=entity_id,
-                name=args.optionname,
-                serverId=dhcpserver_id,
+                api2, entityId=entity_id, name=args.optionname, serverId=dhcpserver_id,
             )
             logger.info(json.dumps(option))
             objtype = getfield(option, "type")

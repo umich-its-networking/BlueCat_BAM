@@ -25,14 +25,10 @@ def main():
     """ip2bogusmac - main"""
     config = argparse.ArgumentParser(description="ip2bogusmac")
     config.add_argument(
-        "ip",
-        help="IP Address",
+        "ip", help="IP Address",
     )
     config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30)",
-        default="WARNING",
+        "--logging", "-l", help="log level, default WARNING (30)", default="WARNING",
     )
     args = config.parse_args()
 

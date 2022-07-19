@@ -71,9 +71,7 @@ def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
     properties = "view=" + str(view_id) + "|"
     for (interfaceid, role, server_name) in interface_list:
         role_obj = conn.do(
-            "getDNSDeploymentRole",
-            entityId=entityId,
-            serverInterfaceId=interfaceid,
+            "getDNSDeploymentRole", entityId=entityId, serverInterfaceId=interfaceid,
         )
         if role_obj["id"] == 0:
             roleid = conn.do(
@@ -90,11 +88,7 @@ def add_dns_roles(entityId, zone_name, interface_list, view_id, conn):
                 print(zone_name, role, server_name, "role exists")
             else:
                 print(
-                    zone_name,
-                    role,
-                    server_name,
-                    "existing role is ",
-                    role_obj["type"],
+                    zone_name, role, server_name, "existing role is ", role_obj["type"],
                 )
 
 

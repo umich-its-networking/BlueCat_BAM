@@ -182,16 +182,9 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
                 if network_obj["properties"].get("sharedNetwork"):
                     del network_obj["properties"]["sharedNetwork"]
                 response = conn.do("update", method="put", body=network_obj)
-                network_obj = conn.do(
-                    "getEntityById",
-                    method="get",
-                    id=network_id,
-                )
+                network_obj = conn.do("getEntityById", method="get", id=network_id,)
                 print(
-                    "updated network (old name",
-                    old_name,
-                    ")",
-                    json.dumps(network_obj),
+                    "updated network (old name", old_name, ")", json.dumps(network_obj),
                 )
             # else:
             # print("existing network", json.dumps(network_obj))
@@ -207,11 +200,7 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
     if not shared or shared != share_name:
         # add new shared network link
         conn.do("shareNetwork", networkId=network_id, tagId=tag_id)
-        network_obj = conn.do(
-            "getEntityById",
-            method="get",
-            id=network_id,
-        )
+        network_obj = conn.do("getEntityById", method="get", id=network_id,)
         if network_obj["properties"].get("sharedNetwork") != share_name:
             print(
                 "ERROR - could not set network",

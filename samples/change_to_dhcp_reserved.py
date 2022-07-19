@@ -42,12 +42,7 @@ def get_ip_by_state(networkid, conn, state):
     """get list of IP objects matching state"""
     logger = logging.getLogger()
     ip_list = get_bam_api_list(
-        conn,
-        "getEntities",
-        parentId=networkid,
-        type="IP4Address",
-        start=0,
-        count=1000,
+        conn, "getEntities", parentId=networkid, type="IP4Address", start=0, count=1000,
     )
     logger.debug(ip_list)
     matching_list = [ip for ip in ip_list if ip["properties"]["state"] == state]

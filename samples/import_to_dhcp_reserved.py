@@ -44,12 +44,7 @@ def get_ip_list(networkid, conn):
     """get list of IP objects"""
     logger = logging.getLogger()
     ip_list = get_bam_api_list(
-        conn,
-        "getEntities",
-        parentId=networkid,
-        type="IP4Address",
-        start=0,
-        count=1000,
+        conn, "getEntities", parentId=networkid, type="IP4Address", start=0, count=1000,
     )
     logger.debug(ip_list)
     return ip_list
@@ -313,8 +308,7 @@ def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
         if fqdn_objs:
             if len(fqdn_objs) > 1:
                 print(
-                    "error, more than one fqdn found, please fix by hand",
-                    line,
+                    "error, more than one fqdn found, please fix by hand", line,
                 )
             else:
                 fqdn = fqdn_objs[0]
@@ -333,10 +327,7 @@ def do_fqdn(conn, line_fqdn, line_ip, view_id, line):
                 ttl=-1,
                 viewId=view_id,
             )
-            fqdn = conn.do(
-                "getEntityById",
-                id=fqdn_id,
-            )
+            fqdn = conn.do("getEntityById", id=fqdn_id,)
         print(fqdn)
 
 
@@ -412,10 +403,7 @@ def get_either_mac(line_mac, conn, configuration_id, ip_obj, args):
 def get_mac(conn, configuration_id, mac):
     """check if mac object exists in bam"""
     mac_obj = conn.do(
-        "getMACAddress",
-        method="get",
-        configurationId=configuration_id,
-        macAddress=mac,
+        "getMACAddress", method="get", configurationId=configuration_id, macAddress=mac,
     )
     if mac_obj["id"] == 0:
         print("no current mac address object for", mac)
@@ -434,10 +422,7 @@ def update_dhcp_allocated(conn, ip_obj, line_mac, line_name):
     )
     if result:
         print("changestate result:", result)
-    new_ip_obj = conn.do(
-        "getEntityById",
-        id=ip_obj["id"],
-    )
+    new_ip_obj = conn.do("getEntityById", id=ip_obj["id"],)
     logger.info("new %s", json.dumps(new_ip_obj))
     ip_obj = new_ip_obj
 
@@ -451,20 +436,11 @@ def replace_dhcp_free(
 ):
     """replace dhcp free"""
     # cannot convert directly to reserved, so delete, and recreate
-    result = conn.do(
-        "delete",
-        objectId=ip_obj["id"],
-    )
+    result = conn.do("delete", objectId=ip_obj["id"],)
     if result:
         print("deleting DHCP_FREE result:", result)
     ip_obj = make_dhcp_reserved(
-        conn,
-        line_ip,
-        line_mac,
-        line_name,
-        line_fqdn,
-        configuration_id,
-        view_id,
+        conn, line_ip, line_mac, line_name, line_fqdn, configuration_id, view_id,
     )
     print("replaced with:", ip_obj)
 
@@ -479,10 +455,7 @@ def update_dhcp_reserved(conn, ip_obj, line_mac, line_name):
         update = True
         ip_obj["name"] = line_name
     if update:
-        result = conn.do(
-            "update",
-            body=ip_obj,
-        )
+        result = conn.do("update", body=ip_obj,)
         if result:
             print(result)
         # # **** update host record

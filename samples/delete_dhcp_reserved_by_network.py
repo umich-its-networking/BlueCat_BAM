@@ -44,12 +44,7 @@ def get_dhcp_reserved(networkid, conn):
     logger = logging.getLogger()
     # ip_list = conn.do(
     ip_list = get_bam_api_list(
-        conn,
-        "getEntities",
-        parentId=networkid,
-        type="IP4Address",
-        start=0,
-        count=1000,
+        conn, "getEntities", parentId=networkid, type="IP4Address", start=0, count=1000,
     )
     logger.info(ip_list)
     reserved_list = [
