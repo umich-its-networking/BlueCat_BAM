@@ -44,24 +44,16 @@ def main():
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-        (configuration_id, view_id) = conn.get_config_and_view(args.configuration, args.view)
+        (configuration_id, view_id) = conn.get_config_and_view(
+            args.configuration, args.view
+        )
 
         obj_list = conn.get_obj_list(args.entity, view_id, record_type)
-
-
-
-
-
-
-
-
-
 
     group_obj = conn.do(
         "getEntityByName", method="get", parentId=0, name=group_name, type="UserGroup"
     )
     group_id = group_obj["id"]
-
 
     # loop over hostnames read from stdin
 

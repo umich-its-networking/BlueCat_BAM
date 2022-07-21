@@ -35,22 +35,22 @@ def main():
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
 
-        (configuration_id, view_id) = conn.get_config_and_view(args.configuration, args.view)
+        (configuration_id, view_id) = conn.get_config_and_view(
+            args.configuration, args.view
+        )
 
         obj_list = conn.get_obj_list(args.entity, view_id, record_type)
 
         for obj in obj_list:
-            get_access_rights(obj,conn)
+            get_access_rights(obj, conn)
 
 
-def get_access_rights(obj,conn):
+def get_access_rights(obj, conn):
     logger = logging.getLogger()
 
     print(json.dumps(obj))
 
-    access_list = conn.get_obj_list("getAccessRightsForEntity",
-        entityId=obj['id']
-    )
+    access_list = conn.get_obj_list("getAccessRightsForEntity", entityId=obj["id"])
     for access in access_list:
         print(json.dumps(access))
 
