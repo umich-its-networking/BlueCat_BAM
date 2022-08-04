@@ -64,16 +64,18 @@ def main():
 
 def sort_by_special(lines, regex, sort_type):  # pylint: disable=R0912
     """sort_by_special"""
+    logger = logging.getLogger()
     decorated = []  # decorated list to sort
     # get a line
     for line in lines:
         # remove linefeed
         line = line.rstrip("\r\n")
+        logger.info("line: '%s'", line)
         # apply regex, if any
         if regex:
             m = re.search(regex, line)
             if m:
-                match = m.group(1)
+                match = m.group(0)
             else:
                 print(line, file=sys.stderr)
                 continue
