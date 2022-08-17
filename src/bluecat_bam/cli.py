@@ -71,53 +71,9 @@ __version__ = "0.2.7"
 
 def main():
     """CLI - Command Line Interface"""
-    config = argparse.ArgumentParser(
-        description="BlueCat Address Manager raw JSON REST API python module and CLI"
+    config = bluecat_bam.BAM.argparsecommon(
+        "BlueCat Address Manager raw JSON REST API python module and CLI"
     )
-    config.add_argument(
-        "--server",
-        "-s",
-        # env_var="BLUECAT_SERVER",
-        default=os.getenv("BLUECAT_SERVER"),
-        help="BlueCat Address Manager hostname",
-    )
-    config.add_argument(
-        "--username",
-        "-u",
-        # env_var="BLUECAT_USERNAME",
-        default=os.getenv("BLUECAT_USERNAME"),
-    )
-    config.add_argument(
-        "--password",
-        "-p",
-        # env_var="BLUECAT_PASSWORD",
-        default=os.getenv("BLUECAT_PASSWORD"),
-        help="password in environment, should not be on command line",
-    )
-    config.add_argument(
-        "--raw",
-        "-r",
-        default=os.getenv("BLUECAT_RAW"),
-        help="set to true to not convert strings like 'name=value|...' "
-        + "to dictionaries on output.  Will accept either format on input.",
-    )
-    config.add_argument(
-        "--raw_in",
-        default=os.getenv("BLUECAT_RAW_IN"),
-        help="set to true to not convert input strings from json to "
-        + "'name-value|...', useful for txt records with json content",
-    )
-    config.add_argument(
-        "--version", action="version", version=__progname__ + ".py " + __version__
-    )
-    config.add_argument(
-        "--logging",
-        "-l",
-        help="log level, default WARNING (30),"
-        + "caution: level DEBUG(10) or lower will show the password in the login call",
-        default=os.getenv("BLUECAT_LOGGING", "WARNING"),
-    )
-    config.add_argument("--verify", default=True, help="verify SSL Cert, default True")
     config.add_argument(
         "command", help="BlueCat REST API command, for example: getEntityById"
     )
@@ -154,10 +110,10 @@ def main():
     logging.debug("raw: %s", args.raw)
     if not args.raw:
         args.raw = False
-        logging.debug("raw_in changed to False")
+        logging.debug("raw set to False")
     else:
         args.raw = make_bool(args.raw)
-        logging.debug("raw_in made bool")
+        logging.debug("raw made bool")
 
     logging.debug("raw_in: %s", args.raw_in)
     if not args.raw_in:

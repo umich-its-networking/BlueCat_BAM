@@ -102,14 +102,25 @@ with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         "getAccessRightsForUser", userId=from_group_id, start=0, count=99999
     )
 
+    # get existing access rights to look for conflicts
+    existing = conn.do(
+        "getAccessRightsForUser", userId=to_group_id, start=0, count=99999
+    )
+    existing_by_id = {right["entityId"]: right for right in existing}
+
     # add access rights to to_group
     for accessright in accessrights:
-        print("add access right: %s" % (accessright))
-        accessrightid = conn.do(
-            "addAccessRight",
-            entityId=accessright["entityId"],
-            userId=to_group_id,
-            value=accessright["value"],
-            overrides=accessright["overrides"],
-            properties=accessright["properties"],
-        )
+        if existing_by_id.get(accessright["entityId"]):
+            print("access right conflict")
+            print("existing: %s" % (existing_by_id[accessright["entityId"]]))
+            print("new: %s" % (accessright))
+        else:
+            print("add access right: %s" % (accessright))
+            accessrightid = conn.do(
+                "addAccessRight",
+                entityId=accessright["entityId"],
+                userId=to_group_id,
+                value=accessright["value"],
+                overrides=accessright["overrides"],
+                properties=accessright["properties"],
+            )

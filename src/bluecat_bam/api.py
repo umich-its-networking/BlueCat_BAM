@@ -429,6 +429,15 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             + "to dictionaries on output.  Will accept either format on input.",
         )
         config.add_argument(
+            "--raw_in",
+            default=os.getenv("BLUECAT_RAW_IN"),
+            help="set to true to not convert input strings from json to "
+            + "'name-value|...', useful for txt records with json content",
+        )
+        config.add_argument(
+            "--verify", default=True, help="verify SSL Cert, default True"
+        )
+        config.add_argument(
             "--version", action="version", version=__progname__ + ".py " + __version__
         )
         config.add_argument(
