@@ -32,7 +32,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     quiet = args.quiet
     obj_id = args.obj_id

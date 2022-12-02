@@ -52,7 +52,7 @@ args = config.parse_args()
 
 logger = logging.getLogger()
 logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-logger.setLevel(args.logging)
+logger.setLevel(args.loglevel)
 
 if not (args.viewId and args.absoluteName and args.txt and args.ttl):
     config.print_help()

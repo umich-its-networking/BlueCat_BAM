@@ -72,7 +72,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         configuration_obj = conn.do(
@@ -132,7 +132,10 @@ def main():
             logger.info(option_id)
 
             option = conn.do(
-                api2, entityId=entity_id, name=args.optionname, serverId=dhcpserver_id,
+                api2,
+                entityId=entity_id,
+                name=args.optionname,
+                serverId=dhcpserver_id,
             )
             print(
                 "    Added %s: type %s,\tname %s,\tvalue %s,\tinherited %s"

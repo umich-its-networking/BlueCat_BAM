@@ -41,13 +41,16 @@ def main():
         + "  Then lines that match are sorted and output to stdout.",
     )
     config.add_argument(
-        "--logging", "-l", help="log level, default WARNING (30)", default="WARNING",
+        "--logging",
+        "-l",
+        help="log level, default WARNING (30)",
+        default="WARNING",
     )
     args = config.parse_args()
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     regex = args.regex
     sort_type = args.type

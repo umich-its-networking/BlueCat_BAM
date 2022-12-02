@@ -44,7 +44,12 @@ def get_dhcp_ranges(networkid, conn):
     """get list of ranges"""
     logger = logging.getLogger()
     range_list = get_bam_api_list(
-        conn, "getEntities", parentId=networkid, type="DHCP4Range", start=0, count=1000,
+        conn,
+        "getEntities",
+        parentId=networkid,
+        type="DHCP4Range",
+        start=0,
+        count=1000,
     )
     logger.debug(range_list)
     return range_list
@@ -76,7 +81,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     rangetype = ""
     offset = int(args.offset)

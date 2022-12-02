@@ -397,7 +397,7 @@ def add_update_get_delete(args, mac_address):
     """add_update_get_delete demo code"""
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     # with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
     with BAM(args.server, args.username, args.password) as conn:

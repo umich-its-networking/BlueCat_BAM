@@ -200,7 +200,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, view_id) = conn.get_config_and_view(

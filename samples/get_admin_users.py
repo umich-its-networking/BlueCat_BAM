@@ -53,7 +53,7 @@ args = config.parse_args()
 
 logger = logging.getLogger()
 logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-logger.setLevel(args.logging)
+logger.setLevel(args.loglevel)
 
 conn = bluecat_bam.BAM(args.server, args.username, args.password)
 

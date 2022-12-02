@@ -66,7 +66,7 @@ import requests
 
 # double underscore names
 __progname__ = "api"
-__version__ = "0.2.7"
+__version__ = "0.3.0"
 
 # python2/3 compatability
 try:
@@ -79,24 +79,31 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     """subclass requests and
     redefine requests.request to a simpler BlueCat interface"""
 
-    def __init__(
+    def __init__(  # pylint: disable=R0913
         self,
         server,
         username,
         password,
+        configuration=None,
+        view=None,
         raw=False,
         raw_in=False,
         timeout=None,
         max_retries=None,
-        verify=True,
+        verify=None,
+        loglevel="WARNING",
     ):
         """login to BlueCat server API, get token, set header"""
+        logger = logging.getLogger()
+        logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
+        logger.setLevel(loglevel.upper())
         self.username = username
         self.password = password
+        self.configuration = configuration
+        self.view = view
         self.timeout = timeout
-        self.verify = verify
-        self.raw = bool(raw)
         self.parentviewcache = {}  # zoneid: viewid
+        self.raw = bool(raw)
         logging.info("raw: %s", self.raw)
         self.raw_in = bool(raw_in)
         logging.info("raw_in: %s", self.raw_in)
@@ -107,6 +114,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         logging.info("url: %s", self.mainurl)
 
         requests.Session.__init__(self)
+
+        if verify and verify in ("False", "false", "No", "no"):
+            self.verify = False
+        else:
+            self.verify = True
+        logging.info("verify: %s", self.verify)
+
         if max_retries:
             adapter = requests.adapters.HTTPAdapter(max_retries=max_retries)
             url_prefix = self.mainurl.split("://", 1)[0] + "://"
@@ -152,9 +166,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             response = self.get(
                 self.mainurl + "login?",
                 params={"username": self.username, "password": self.password},
+                verify=self.verify,
+                timeout=self.timeout,
             )
         except requests.exceptions.ConnectionError as errormsg:
             print("failed to login: ", errormsg)
+            print("verify", self.verify)
             raise requests.exceptions.ConnectionError
         if response.status_code != 200:
             print(response.json(), file=sys.stderr)
@@ -441,12 +458,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             "--version", action="version", version=__progname__ + ".py " + __version__
         )
         config.add_argument(
-            "--logging",
+            "--loglevel",
+            "--logging",  # for backwards compatability
             "-l",
             help="log level, default WARNING (30),"
             + "caution: level DEBUG(10) or less "
             + "will show the password in the login call",
-            default=os.getenv("BLUECAT_LOGGING", "WARNING"),
+            default=os.getenv("BLUECAT_LOGLEVEL", "WARNING"),
         )
         return config
 
@@ -846,8 +864,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             parent_id = zone_obj.get("id")
             current_domain = ".".join(domain_label_list[zone_start:])
             logger.info("current_domain: %s, zone: %s", current_domain, zone_obj)
+            zone_end = zone_start
             if zone_start != 0:
-                zone_end = zone_start
                 zone_start -= 1
                 search_domain = ".".join(domain_label_list[zone_start:zone_end])
             else:

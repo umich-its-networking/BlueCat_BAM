@@ -66,7 +66,7 @@ import bluecat_bam
 
 # double underscore names
 __progname__ = "cli"
-__version__ = "0.2.7"
+__version__ = "0.3.0"
 
 
 def main():
@@ -82,7 +82,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     # should use a 'comprehension' ?? ***
     params = {}  # create the params dictionary

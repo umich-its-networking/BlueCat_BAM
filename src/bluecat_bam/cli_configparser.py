@@ -120,7 +120,7 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.logging)
+    logger.setLevel(args.loglevel)
 
     cfg = configparser.ConfigParser()
     cfg.read("bluecat_login_credentials")
