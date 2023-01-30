@@ -775,7 +775,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return None, None
 
     def getserverbyservername(self, server_name, configuration_id):
-        """get server by servername"""
+        """get server by servername, return server_obj, interface_obj"""
         # try another method, in case they gave the server display name instead
         server_obj_list = self.do(
             "getEntitiesByNameUsingOptions",
