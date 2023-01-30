@@ -98,8 +98,8 @@ def get_deployment_option(conn, args, obj):
     cidr = getprop(obj, "CIDR")
     start = getprop(obj, "start")
     end = getprop(obj, "end")
-    print("For entity: ", objtype, name, cidr, start, end, "Options:")
-    # print(obj)
+    #print("For entity: ", objtype, name, cidr, start, end, "Options:")
+    #print(obj)
 
     options = conn.do(
         "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
@@ -113,8 +113,8 @@ def get_deployment_option(conn, args, obj):
         name = getfield(option, "name")
         value = getfield(option, "value")
         inherited = getprop(option, "inherited")
-        print("    ", opt_id, objtype, name, value, inherited)
-        # print(json.dumps(option))
+        #print("    ", opt_id, objtype, name, value, inherited)
+        print(json.dumps(option))
     print()  # blank line after each set of lines
 
 
