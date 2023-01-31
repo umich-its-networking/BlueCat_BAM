@@ -72,34 +72,11 @@ def main():
             get_deployment_option(conn, args, obj)
 
 
-def getfield(obj, fieldname):
-    """get a field for printing"""
-    field = obj.get(fieldname)
-    if field:
-        output = fieldname + ": " + str(field) + ", "
-    else:
-        output = ""
-    return output
-
-
-def getprop(obj, fieldname):
-    """get a property for printing"""
-    return getfield(obj["properties"], fieldname)
-
-
 def get_deployment_option(conn, args, obj):
     """get deployment options for the range"""
     logger = logging.getLogger()
     optionlist = args.options
-
     obj_id = obj["id"]
-    objtype = getfield(obj, "type")
-    name = getfield(obj, "name")
-    cidr = getprop(obj, "CIDR")
-    start = getprop(obj, "start")
-    end = getprop(obj, "end")
-    #print("For entity: ", objtype, name, cidr, start, end, "Options:")
-    #print(obj)
 
     options = conn.do(
         "getDeploymentOptions", entityId=obj_id, optionTypes="", serverId=-1
@@ -108,12 +85,7 @@ def get_deployment_option(conn, args, obj):
     for option in options:
         if optionlist and option.get("name") not in optionlist:
             continue
-        opt_id = getfield(option, "id")
-        objtype = getfield(option, "type")
-        name = getfield(option, "name")
-        value = getfield(option, "value")
-        inherited = getprop(option, "inherited")
-        #print("    ", opt_id, objtype, name, value, inherited)
+
         print(json.dumps(option))
     print()  # blank line after each set of lines
 

@@ -13,7 +13,9 @@ import bluecat_bam
 
 def main():
     """add generic record"""
-    config = bluecat_bam.BAM.argparsecommon("BlueCat Address Manager add generic record")
+    config = bluecat_bam.BAM.argparsecommon(
+        "BlueCat Address Manager add generic record"
+    )
     config.add_argument("hostname")
     config.add_argument("type")
     config.add_argument("data")

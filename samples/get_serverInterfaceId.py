@@ -16,7 +16,9 @@ __version__ = "0.2"
 
 def main():
     """get server interface id"""
-    config = bluecat_bam.BAM.argparsecommon("BlueCat Address Manager get_serverInterfaceId")
+    config = bluecat_bam.BAM.argparsecommon(
+        "BlueCat Address Manager get_serverInterfaceId"
+    )
     config.add_argument("bdds", help="BDDS server name")
     args = config.parse_args()
 

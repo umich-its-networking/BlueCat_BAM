@@ -29,13 +29,13 @@ def main():
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
         (configuration_id, _) = conn.get_config_and_view(args.configuration)
 
-        server_obj, interface_obj = conn.getserverbyservername(server_name, configuration_id)
+        server_obj, _ = conn.getserverbyservername(server_name, configuration_id)
         if server_obj:
-            print(server_obj['id'])
+            print(server_obj["id"])
         else:
-            print("Server not found: ",server_name)
-        #print(server_obj)
-        #print(interface_obj)
+            print("Server not found: ", server_name)
+        # print(server_obj)
+        # print(interface_obj)
 
 
 if __name__ == "__main__":
