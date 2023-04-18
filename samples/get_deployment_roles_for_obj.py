@@ -28,6 +28,12 @@ def main():
         "object",
         help="block or network CIDR, zone name, or any object_id, or filename",
     )
+    config.add_argument(
+        "--type",
+        help="DNS record type, like HostRecord, AliasRecord, TXTRecord, "
+        + "GenericRecord, etc, or Entity to get all types",
+        default="Entity",
+    )
     config.add_argument("--service", help="optional: DNS, DHCP, DHCP6, TFTP, etc")
 
     args = config.parse_args()
@@ -35,11 +41,18 @@ def main():
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
     logger.setLevel(args.loglevel)
+    #print(args.loglevel)
 
     with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
-        (configuration_id, _) = conn.get_config_and_view(args.configuration, args.view)
+        (configuration_id, view_id) = conn.get_config_and_view(args.configuration, args.view)
 
-        obj_list = conn.get_obj_list(args.object, configuration_id, "")
+        if args.type in ("Zone", "HostRecord", "AliasRecord", "GenericRecord", "EnumZone", "ExternalHostRecord",
+          "HINFORecord",  "MXRecord", "NAPTRRecord",  "SRVRecord", "TXTRecord" ):
+          container_id = view_id
+        else:
+            container_id = configuration_id
+        obj_list = conn.get_obj_list(args.object, container_id, args.type)
+        #print(obj_list)
 
         for obj in obj_list:
             get_deployment_roles(obj, conn, args)
@@ -57,7 +70,7 @@ def get_deployment_roles(obj, conn, args):
         obj["properties"].get("CIDR"),
         obj["properties"].get("sharedNetwork"),
     )
-    print(out)
+    #print(out)
     outlist = []
     for role in roles:
         # print("    ",role)
