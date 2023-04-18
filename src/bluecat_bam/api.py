@@ -91,12 +91,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         timeout=None,
         max_retries=None,
         verify=None,
-        loglevel="WARNING",
+        loglevel=None,
     ):
         """login to BlueCat server API, get token, set header"""
         logger = logging.getLogger()
         logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-        logger.setLevel(loglevel.upper())
+        if loglevel:
+            logger.setLevel(loglevel.upper())
         self.username = username
         self.password = password
         self.configuration = configuration
@@ -523,6 +524,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     def get_obj_list(self, object_ident, containerId, object_type):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
+        #logger.warning("log level is %s, logger %s",logger.getEffectiveLevel(),logger)
         logger.info(
             "get_obj_list object_ident: %s, containerId: %s, object_type: %s",
             object_ident,
@@ -538,7 +540,9 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
         obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False)
-        if obj and (obj_type == "fqdn" or obj["id"]):
+        if type(obj) == type(list()):
+            obj_list = obj
+        elif obj and  obj["id"]:
             obj_list = [obj]
         elif obj_type:
             print("not found", object_ident, obj_type)
@@ -613,7 +617,8 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     # pylint: disable=R0912
     def get_obj(self, object_ident, containerId, object_type, warn=True):
         """get an object, given an id, IP, CIDR, or range,
-        return object and type matched"""
+        return object and type matched
+        can return a list in some cases like fqdn"""
         logger = logging.getLogger()
         logger.info(
             "get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
@@ -673,8 +678,10 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 print("IP4Range not found: %s" % (object_ident))
         elif obj_type == "fqdn":
             # just return the fqdn, because it can resolve to multiple objects
-            obj = object_ident
-            # obj = self.get_fqdn(object_ident, containerId, object_type)
+            #obj = object_ident
+            obj_list = self.get_fqdn(object_ident, containerId, object_type)
+            obj = obj_list  # return the list
+            pass
         elif obj_type is None:
             pass
         else:
