@@ -29,7 +29,10 @@ def main():
 
     logger = logging.getLogger()
     logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
-    logger.setLevel(args.loglevel)
+    print("loglevel",args.loglevel)
+    if args.loglevel:
+        logger.setLevel(args.loglevel)
+    logger.info("loglevel is %s, logger is %s",logger.getEffectiveLevel(), logger)
 
     record_type = args.type
 
@@ -41,10 +44,13 @@ def main():
 
         for domain_name in obj_list:
             get_fqdn(domain_name, view_id, record_type, conn)
+    logger.info("loglevel is now %s, logger is %s",logger.getEffectiveLevel(), logger)
 
 
 def get_fqdn(domain_name, view_id, record_type, conn):
     """get object given fqdn and record type"""
+    logger = logging.getLogger()
+    logger.info("loglevel in get_fqdn %s, logger is %s",logger.getEffectiveLevel(), logger)
     entities = conn.get_fqdn(domain_name, view_id, record_type)
     for entity in entities:
         print(json.dumps(entity))
