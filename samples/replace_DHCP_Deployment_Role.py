@@ -118,7 +118,7 @@ def main():
             roles = conn.do("getDeploymentRoles", entityId=entityId)
             for role in roles:
                 # print("checking role",json.dumps(role))
-                if role["service"] == "DHCP":
+                if role["service"] == "DHCP" and role["properties"].get("inherited") != 'true':
                     print("deleting existing role", json.dumps(role))
                     conn.do("delete", objectId=role["id"])
 

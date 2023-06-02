@@ -76,6 +76,7 @@ def get_deployment_option(conn, args, obj):
     """get deployment options for the range"""
     logger = logging.getLogger()
     optionlist = args.options
+    print(obj)
     obj_id = obj["id"]
 
     options = conn.do(

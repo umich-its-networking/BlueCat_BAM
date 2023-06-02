@@ -193,6 +193,7 @@ def main():
         + "or a filename or stdin('-') with any of those on each line "
         + "unless 'type' is set to override the pattern matching",
     )
+    config.add_argument("--objects","-o", action="store_true", help="show objects instead of just the main info")
     args = config.parse_args()
 
     logger = logging.getLogger()
@@ -219,21 +220,26 @@ def main():
         for entity in obj_list:
             entityId = entity["id"]
             cidr = entity["properties"]["CIDR"]
-            print(
-                "Network: %s\t%s size %s"
-                % (entity["name"], cidr, ipaddress.IPv4Network(cidr).num_addresses)
-            )
+            if args.objects:
+                print(entity)
+            else:
+                print(
+                    "Network: %s\t%s size %s"
+                    % (entity["name"], cidr, ipaddress.IPv4Network(cidr).num_addresses)
+                )
             # print(entity)
 
             # print("Ranges:")
             ranges_list = get_dhcp_ranges(entityId, conn, logger)
             # print(ranges_list)
             for x in ranges_list:
-                # print(x)
-                start = ipaddress.ip_address(x["properties"]["start"])
-                end = ipaddress.ip_address(x["properties"]["end"])
-                rangesize = int(end) - int(start) + 1
-                print("    DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
+                if args.objects:
+                    print(x)
+                else:
+                    start = ipaddress.ip_address(x["properties"]["start"])
+                    end = ipaddress.ip_address(x["properties"]["end"])
+                    rangesize = int(end) - int(start) + 1
+                    print("    DHCP_range: %s-%s\tsize %s" % (start, end, rangesize))
             if not ranges_list:
                 print("    DHCP_range: none")
 

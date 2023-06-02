@@ -521,25 +521,26 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
-    def get_obj_list(self, object_ident, containerId, object_type):
+    def get_obj_list(self, object_ident, containerId, object_type, view_id=None):
         """get object, or a list of objects from a file or stdin('-')"""
         logger = logging.getLogger()
         #logger.warning("log level is %s, logger %s",logger.getEffectiveLevel(),logger)
         logger.info(
-            "get_obj_list object_ident: %s, containerId: %s, object_type: %s",
+            "get_obj_list object_ident: %s, containerId: %s, object_type: %s, view_id: %s",
             object_ident,
             containerId,
             json.dumps(object_type),
+            view_id
         )
         obj_list = []
         if object_ident == "-":
             # return iterator someday ***
             with sys.stdin as f:
-                obj_list = self.get_obj_lines(f, containerId, object_type)
+                obj_list = self.get_obj_lines(f, containerId, object_type, view_id=view_id)
             # remove failed entries
             new_obj_list = [obj for obj in obj_list if obj]
             return new_obj_list
-        obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False)
+        obj, obj_type = self.get_obj(object_ident, containerId, object_type, warn=False, view_id=view_id)
         if type(obj) == type(list()):
             obj_list = obj
         elif obj and  obj["id"]:
@@ -556,13 +557,13 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 logger.info("failed to find object or open file: '%s'", object_ident)
         return obj_list
 
-    def get_obj_lines(self, fd, containerId, object_type):
+    def get_obj_lines(self, fd, containerId, object_type, view_id=None):
         """read lines, get obj, return obj list"""
         logger = logging.getLogger()
         obj_list = []
         for line in fd:
             if line.strip() != "":
-                obj, object_type = self.get_obj(line.strip(), containerId, object_type)
+                obj, object_type = self.get_obj(line.strip(), containerId, object_type, view_id=view_id)
                 logger.info("get_obj_lines got obj %s, ", obj)
                 if obj and (object_type == "fqdn" or obj["id"]):
                     obj_list.append(obj)
@@ -615,17 +616,18 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return obj_type, part1, part2
 
     # pylint: disable=R0912
-    def get_obj(self, object_ident, containerId, object_type, warn=True):
+    def get_obj(self, object_ident, containerId, object_type, warn=True, view_id=None):
         """get an object, given an id, IP, CIDR, or range,
         return object and type matched
         can return a list in some cases like fqdn"""
         logger = logging.getLogger()
         logger.info(
-            "get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s",
+            "get_obj object_ident: %s, containerId: %s, object_type: %s, warn: %s, view_id: %s",
             object_ident,
             containerId,
             json.dumps(object_type),
             warn,
+            view_id
         )
         obj_type, part1, part2 = self.match_type(object_ident)
         if object_type is None:
@@ -679,7 +681,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         elif obj_type == "fqdn":
             # just return the fqdn, because it can resolve to multiple objects
             #obj = object_ident
-            obj_list = self.get_fqdn(object_ident, containerId, object_type)
+            obj_list = self.get_fqdn(object_ident, view_id, object_type)
             obj = obj_list  # return the list
             pass
         elif obj_type is None:
@@ -692,7 +694,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         return obj, obj_type
 
     def get_range(self, address, containerId, object_type):
-        """get range - block, network, or dhcp range - by IPv4 or IPv6"""
+        """get range - block, network, or dhcp range - by IPv4 or IPv6 - can use CIDR"""
         logger = logging.getLogger()
         logger.info(
             "get_range for address: %s, containerId %s, object_type %s",
@@ -700,6 +702,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             containerId,
             json.dumps(object_type),
         )
+        if '/' in address:
+            address, prefix = address.split('/')
+            logger.info("ip %s, prefix %s",address, prefix)
+        else:
+            prefix=None
         if object_type is None:
             object_type = ""  # standardize the value
         obj = self.do(
@@ -713,16 +720,24 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             if obj_id:
                 cidr = obj["properties"].get("CIDR")
                 start = obj["properties"].get("start")
+                logging.info("id %s cidr %s start %s",obj_id,cidr,start)
         logging.info("getIPRangedByIP obj = %s", json.dumps(obj))
         if obj_id == 0:
             obj = None
         elif start and start != address:
             obj = None
         elif cidr:
-            (obj_ip, _) = cidr.split("/")
+            (obj_ip, obj_prefix) = cidr.split("/")
+            logging.info("ip %s prefix %s",obj_ip,obj_prefix)
             if obj_ip != address:
                 obj = None
             else:
+                logging.info("prefix %s obj_prefix %s", prefix, obj_prefix)
+                while prefix and obj_prefix > prefix:
+                    obj=self.do("getParent",entityId=obj['id'])
+                    (obj_ip, obj_prefix) = obj['properties']['CIDR'].split("/")
+                    logger.info('parent ip %s prefix %s',obj_ip, obj_prefix)
+                    ### more steps
                 # bug in BlueCat - if Block and Network have the same CIDR,
                 # it should return the Network, but it returns the Block.
                 # So check for a matching Network.
@@ -887,9 +902,9 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         logger = logging.getLogger()
         zone_obj, remainder = self.get_zone(domain_name, view_id)
         if record_type.lower() == "zone":
-            entities = [zone_obj]
+            entities = []   # will add zone below, if remainder is empty
         else:
-            entities = self.do(
+            entities1 = self.do(
                 "getEntitiesByNameUsingOptions",
                 method="get",
                 parentId=zone_obj["id"],
@@ -899,6 +914,12 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
                 start=0,
                 count=1000,
             )
+            entities = [ entity for entity in entities1 if entity.get('type') not in ('DNSOption','DHCPRawOption',
+                        'DHCPServiceOption','DHCPV4ClientOption',
+                     'DHCPV6ClientOption','DHCPV6RawOption','DHCPV6ServiceOption','DNSRawOption')]
+        # if remainder was empty, then the zone also counts
+        if remainder == '':
+            entities.append(zone_obj)
         logger.info("entities: %s", entities)
         return entities
 
