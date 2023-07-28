@@ -61,6 +61,7 @@ config.add_argument(
     "--host", "--hostname", "--fqdn", "--dns", "-d", help="optional - hostname"
 )
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"
