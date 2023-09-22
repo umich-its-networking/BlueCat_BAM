@@ -31,6 +31,6 @@ setup(
     setup_requires=["pytest-runner"],
     tests_require=tests_require,
     extras_require={"test": tests_require},
-    install_requires=["requests==2.21.0"],
+    install_requires=["requests>=2.31.0"],
     entry_points={"console_scripts": ["bam=bluecat_bam.cli:main"]},
 )
