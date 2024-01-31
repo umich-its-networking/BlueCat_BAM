@@ -13,7 +13,7 @@ import logging
 import bluecat_bam
 
 
-config = argparse.ArgumentParser(description="add next dhcp reserved")
+config = argparse.ArgumentParser(description="get system info")
 config.add_argument(
     "--server",
     "-s",
