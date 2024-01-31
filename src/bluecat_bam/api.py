@@ -515,9 +515,9 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             listall.extend(listone)
         return listall
 
-    def get_id_list(self, object_ident, containerId, object_type):
+    def get_id_list(self, object_ident, containerId, object_type, view_id=None):
         """get object id, or a list of objects from a file"""
-        obj_list = self.get_obj_list(object_ident, containerId, object_type)
+        obj_list = self.get_obj_list(object_ident, containerId, object_type, view_id=view_id)
         id_list = [obj.get("id") for obj in obj_list]
         return id_list
 
@@ -550,7 +550,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
         else:  # not an object, must be a file name
             try:
                 with open(object_ident) as f:
-                    obj_list = self.get_obj_lines(f, containerId, object_type)
+                    obj_list = self.get_obj_lines(f, containerId, object_type, view_id=view_id)
                 logger.info(obj_list)
                 return obj_list
             except ValueError:
@@ -565,7 +565,9 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             if line.strip() != "":
                 obj, object_type = self.get_obj(line.strip(), containerId, object_type, view_id=view_id)
                 logger.info("get_obj_lines got obj %s, ", obj)
-                if obj and (object_type == "fqdn" or obj["id"]):
+                if type(obj) == type(list()):
+                    obj_list.extend(obj)
+                elif obj and (object_type == "fqdn" or obj["id"]):
                     obj_list.append(obj)
                 else:
                     print("not found", line)
@@ -679,10 +681,11 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
             else:
                 print("IP4Range not found: %s" % (object_ident))
         elif obj_type == "fqdn":
-            # just return the fqdn, because it can resolve to multiple objects
-            #obj = object_ident
+            # can resolve to multiple objects and types
             obj_list = self.get_fqdn(object_ident, view_id, object_type)
             obj = obj_list  # return the list
+            if object_type:
+                obj_type = object_type  # fqdn is not a real object type, so return the requested type
             pass
         elif obj_type is None:
             pass
