@@ -78,7 +78,7 @@ pip install setuptools
 ## Normal Installation ##
 Download with git as shown, or with curl or wget or web browser
 ```
-git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
+git clone https://github.com/umich-its-networking/BlueCat_BAM.git
 cd bluecat_bam
 pip install wheel
 pip install .
@@ -87,7 +87,7 @@ If installed as a user, you might need to add "~/.local/bin" to your PATH
 
 ## Dev Installation in virtualenv ##
 ```
-git clone git@gitlab.umich.edu:its-public/bluecat_bam.git
+git clone https://github.com/umich-its-networking/BlueCat_BAM.git
 cd bluecat_bam
 python3 -m venv venv
 source ./venv/bin/activate
