@@ -309,7 +309,7 @@ class BAM(requests.Session):  # pylint: disable=R0902,R0904
     @staticmethod
     def convert_str_to_dict(value):
         """convert string to dict"""
-        if isinstance(value, basestring) and "|" in value:
+        if isinstance(value, basestring) and "|" in value and "=" in value:
             value = dict(
                 # using a python "generator", not a "comprehension"
                 item.split("=", 1)
