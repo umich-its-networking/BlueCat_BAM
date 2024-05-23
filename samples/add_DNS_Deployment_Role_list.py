@@ -117,12 +117,13 @@ def cidr2zonename(cidr):
     findip = re.match(r"[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}\Z", cidr)
     if findip:
         (ip, prefix) = cidr.split("/")
+        prefixnum=int(prefix)
         octets = ip.split(".")
-        if prefix <= "8":
+        if prefixnum <= 8:
             zone_name = octets[0] + ".in-addr.arpa"
-        elif prefix <= "16":
+        elif prefixnum <= 16:
             zone_name = octets[1] + "." + octets[0] + ".in-addr.arpa"
-        elif prefix <= "24":
+        elif prefixnum <= 24:
             zone_name = octets[2] + "." + octets[1] + "." + octets[0] + ".in-addr.arpa"
         else:
             errormsg = "not a supported CIDR"
