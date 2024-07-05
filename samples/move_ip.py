@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""move_ip.py --type type --host domain_name --new new_domain_name"""
+"""move_ip.py type old_ip  new_ip"""
 
 # to be python2/3 compatible:
 from __future__ import print_function
