@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+
+"""import_zone.py domainname filename"""
+
+# to be python2/3 compatible:
+from __future__ import print_function
+
+import logging
+import bluecat_bam
+
+
+def main():
+    """import_zone.py"""
+    config = bluecat_bam.BAM.argparsecommon("import_zone")
+    config.add_argument("domain_name", help="DNS domain name or hostname")
+    config.add_argument(
+        "file_name", help="file containing zone in dig axfr format"
+    )
+
+    args = config.parse_args()
+
+    logger = logging.getLogger()
+    logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s")
+    logger.setLevel(args.loglevel)
+
+    configuration_name = args.configuration
+    view_name = args.view
+    domain_name = args.domain_name
+    file_name = args.file_name
+
+    with bluecat_bam.BAM(args.server, args.username, args.password) as conn:
+
+        (_, view_id) = conn.get_config_and_view(configuration_name, view_name)
+
+        zone, remainder = conn.get_zone(domain_name, view_id)
+
+        with open(file_name,"r") as f:
+            import_zone_from_file(domain_name,f)
+
+def import_zone_from_file(domain_name,f):
+    """import zone from file"""
+    ipdict={}	# save IP's already seen, and whether they are in a BlueCat network or not (True/False)
+    later=[]	# list of lines to process later
+    for line in f:
+        print("line:",line)
+        fields=line.rstrip().split(maxsplit=4)
+        print("fields:",fields)
+        if fields[3] == "A":
+            add_a(fields,ipdict)
+        else:
+            later.append(line)
+            print("save for later: ", line)
+
+
+def add_a(fields,ipdict):
+    """add A record"""
+    print("add A record for ",fields)
+
+
+
+
+if __name__ == "__main__":
+    main()
