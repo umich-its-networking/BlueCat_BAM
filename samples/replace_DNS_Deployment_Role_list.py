@@ -14,6 +14,7 @@ from __future__ import print_function
 import sys
 import logging
 import re
+import json
 
 import bluecat_bam
 
@@ -42,7 +43,7 @@ def readserverlist(serverlistfile, conn, configuration_id):
             (server_name, role) = line.split()
 
             if role not in role_validation:
-                print("ERROR - role not valid:", role)
+                logging.warning(f"ERROR - role not valid: {role}")
                 sys.exit(1)
 
             interface = conn.getinterface(server_name, configuration_id)
@@ -51,22 +52,22 @@ def readserverlist(serverlistfile, conn, configuration_id):
                 row = (interfaceid, role, server_name)
                 interface_list.append(row)
             else:
-                print("server interface not found: %s" % (server_name))
+                logging.warning(f"server interface not found: {server_name}")
                 return None
-            # print(interface_obj_list[0])
+            logging.info(interface_list[0])
             # done building the interfaces list
 
         # print list of interfaces and roles
         for row in interface_list:
             (interfaceid, role, server_name) = row
-            # print(interfaceid, role)
+            logging.info(f'{interfaceid} {role}')
     return interface_list
 
 
 def remove_dns_roles(entityId, conn):
     """remove any non-inherited DNS roles"""
     roles = conn.do("getDeploymentRoles", entityId=entityId)
-    #print('roles: ', roles)
+    logging.info(f'roles: {roles}')
     for role in roles:
         print("checking role",role)
         if role["service"] == "DNS" and role["properties"].get("inherited") != 'true':
@@ -127,15 +128,18 @@ def cidr2zonename(cidr):
     findip = re.match(r"[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}\Z", cidr)
     if findip:
         (ip, prefix) = cidr.split("/")
+        prefix=int(prefix)
+        logging.info(f'ip: {ip}, prefix: {prefix}')
         octets = ip.split(".")
-        if prefix <= "8":
+        if prefix <= 8:
             zone_name = octets[0] + ".in-addr.arpa"
-        elif prefix <= "16":
+        elif prefix <= 16:
             zone_name = octets[1] + "." + octets[0] + ".in-addr.arpa"
-        elif prefix <= "24":
+        elif prefix <= 24:
             zone_name = octets[2] + "." + octets[1] + "." + octets[0] + ".in-addr.arpa"
         else:
-            errormsg = "not a supported CIDR"
+            zone_name = octets[3] + "-" + str(prefix) + "." + octets[2] + "." + octets[1] + "." + octets[0] + ".in-addr.arpa"
+            #errormsg = "not a supported CIDR"
     else:
         errormsg = "not a valid CIDR"
     return zone_name, errormsg
@@ -153,10 +157,10 @@ def get_network(cidr, configuration_id, conn):
         type="IP4Block",
         address=ip,
     )
-    # print("block_obj",json.dumps(block_obj))
+    logging.info(f'block_obj {json.dumps(block_obj)}')
 
     if block_obj["properties"]["CIDR"] == cidr:
-        # print('found matching block',json.dumps(block_obj))
+        logging.info(f'found matching block {json.dumps(block_obj)}')
         entity = block_obj
     else:
         # find network
@@ -168,12 +172,12 @@ def get_network(cidr, configuration_id, conn):
             address=ip,
         )
         network_id = network_obj["id"]
-        # print("existing network",json.dumps(network_obj))
+        logging.info(f'existing network {json.dumps(network_obj)}')
 
         if network_id == 0:
             entity = {}
         elif network_obj["properties"]["CIDR"] == cidr:
-            # print("found matching network",json.dumps(network_obj))
+            logging.info(f'found matching network {json.dumps(network_obj)}')
             entity = network_obj
         else:
             entity = {}
@@ -201,7 +205,7 @@ def get_zone(zone_name, view_id, conn):
             break
         parent_id = zone.get("id")
         current_domain = zone.get("name") + "." + current_domain
-        # print(json.dumps(domain_label_list))
+        logging.info(json.dumps(domain_label_list))
         if domain_label_list:
             search_domain = domain_label_list.pop()
         else:
@@ -209,7 +213,7 @@ def get_zone(zone_name, view_id, conn):
             break
 
     if current_domain == zone_name + ".":
-        # print("found zone", json.dumps(zone))
+        logging.info(f'found zone {json.dumps(zone)}')
         return zone
     return {}
 
@@ -260,26 +264,26 @@ def main():
             if ".in-addr.arpa" in line:
                 zone_name = line
                 cidr = zonename2cidr(zone_name)
-                print("found in-addr", line, "CIDR",cidr)
+                logging.info(f'found in-addr {line} CIDR {cidr}')
             elif "/" in line:
                 cidr = line
                 zone_name, errormsg = cidr2zonename(cidr)
                 if errormsg:
-                    print("ERROR - / in line, but not valid CIDR", line)
+                    logging.warning(f"ERROR - / in line, but not valid CIDR {line}")
                     continue
-                print("found /", line)
+                print(f"found / in: {line}")
             if cidr:
                 (ip, prefix) = cidr.split("/")
-                print("CIDR", cidr, "zone", zone_name, "ip", ip, "prefix", prefix)
+                logging.info(f"CIDR {cidr} zone {zone_name} ip {ip} prefix {prefix}")
 
                 # find the block or network
                 #entity = get_network(cidr, configuration_id, conn)
                 entity = conn.get_range( cidr, configuration_id, "")
 
                 if not entity:
-                    print("network not found", line)
+                    logging.warning(f"network not found {line}")
                     continue
-                # print("found entity", json.dumps(entity))
+                logging.info(f"found entity {json.dumps(entity)}")
 
             else:  # no cidr, so a zone name
                 zone_name = line
@@ -291,13 +295,14 @@ def main():
                 # spent hours debugging, hence the detailed dump
                 # turned out to be a linefeed on the zone name read in
                 # so added .strip() above
-                print("not found", zone_name)
+                logging.warning(f"not found {zone_name}")
                 continue
 
             # found entityId that needs DNS roles, now replace them
             entityId = entity["id"]
             remove_dns_roles(entityId, conn)
             add_dns_roles(entityId, zone_name, interface_list, view_id, conn)
+            # update_dns_roles(entityId, zone_name, interface_list, view_id, conn)
 
 
 if __name__ == "__main__":

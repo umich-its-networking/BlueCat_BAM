@@ -50,7 +50,7 @@ config.add_argument(
 config.add_argument("--name", "-n", help="Network name (optional)", default="")
 config.add_argument("--vlan", help="VLAN id number (optional)", default="")
 config.add_argument(
-    "--logging",
+    "--loglevel",
     "-l",
     help="log level, default WARNING (30),"
     + "caution: level DEBUG(10) or less will show the password in the login call",
@@ -69,17 +69,20 @@ network_name = args.name
 vlan = args.vlan
 
 if not (configuration_name and view_name and network_cidr):
+    print("need configuration and view in environment or command line options")
     config.print_help()
     sys.exit(1)
 
 try:
     (network_ip, prefix) = network_cidr.split("/", 1)
 except ValueError:
+    print("failed to split CIDR into IP and prefix")
     config.print_help()
     sys.exit(1)
 logging.info("network_ip %s and prefix %s", network_ip, prefix)
 
 if not (network_ip and prefix):
+    print("network or prefix is empty")
     config.print_help()
     sys.exit(1)
 
