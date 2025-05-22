@@ -50,6 +50,7 @@ config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VI
 config.add_argument("--type", help="DNS record type", default="HostRecord")
 config.add_argument("--group", help="name of group to be given Change rights")
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"
