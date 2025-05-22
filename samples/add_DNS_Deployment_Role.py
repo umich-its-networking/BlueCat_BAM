@@ -52,6 +52,7 @@ def main():
         "--version", action="version", version=__progname__ + ".py " + __version__
     )
     config.add_argument(
+	"--loglevel",
         "--logging",
         "-l",
         help="log level, default WARNING (30),"
