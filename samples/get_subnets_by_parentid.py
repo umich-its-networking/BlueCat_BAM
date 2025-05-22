@@ -45,6 +45,7 @@ config.add_argument(
 )
 config.add_argument("parent_id", help="Id of parent Configuration or Block")
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

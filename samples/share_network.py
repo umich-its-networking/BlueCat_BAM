@@ -51,6 +51,7 @@ config.add_argument(
     "--group", "-g", help="shared network group name", default="Shared Networks"
 )
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

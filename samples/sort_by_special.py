@@ -41,6 +41,7 @@ def main():
         + "  Then lines that match are sorted and output to stdout.",
     )
     config.add_argument(
+        "--loglevel",
         "--logging",
         "-l",
         help="log level, default WARNING (30)",

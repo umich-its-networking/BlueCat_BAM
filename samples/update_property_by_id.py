@@ -50,6 +50,7 @@ config.add_argument(
 )
 config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VIEW"))
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

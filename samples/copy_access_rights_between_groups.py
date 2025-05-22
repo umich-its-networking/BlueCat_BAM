@@ -47,6 +47,7 @@ config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VI
 config.add_argument("from_group", help="group name or user name")
 config.add_argument("to_group", help="group name or user name")
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

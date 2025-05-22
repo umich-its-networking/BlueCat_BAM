@@ -49,6 +49,7 @@ config.add_argument("--view", help="BlueCat View", default=os.getenv("BLUECAT_VI
 config.add_argument("--owner_id", "-o", help="id of user or group")
 config.add_argument("--entity_id", "-e", help="id of entity")
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

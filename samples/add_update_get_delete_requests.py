@@ -47,6 +47,7 @@ config.add_argument(
     default=os.getenv("BLUECAT_CONFIGURATION"),
 )
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"

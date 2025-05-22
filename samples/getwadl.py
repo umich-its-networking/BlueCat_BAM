@@ -34,6 +34,7 @@ config.add_argument(
     help="password in environment, should not be on command line",
 )
 config.add_argument(
+    "--loglevel",
     "--logging",
     "-l",
     help="log level, default WARNING (30),"
