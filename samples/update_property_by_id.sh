@@ -23,7 +23,7 @@ fi
 
 entity_id=$1
 saveIFS=$IFS
-IFS=/
+IFS='='
 set $2
 prop=$1
 value=$2
@@ -34,19 +34,33 @@ if [ "X" = "X${prop:-}" -o "X" = "X${value:-}" ]; then
 fi
 
 token=`curl -s -k 'https://'$server'/Services/REST/v1/login?username='"$username"'&password='"$password"`
-tokenheader=`echo $token | sed -e 's/^"Session Token-> /Authorization: /' -e 's/ <- for User : .*$//'`
+tokenheader=`echo $token | sed -E -e 's/^"Session Token-> /Authorization: /' -e 's/ <- for User : .*$//'`
 
 obj=`curl -s -k -H "$tokenheader" 'https://'$server'/Services/REST/v1/getEntityById?id='$entity_id`
 
 echo $obj
 echo "change property in local copy of the object"
-updatedentity=`echo $entity | jq -c '.'"$prop"' |= "'"$value"'" ' `
+found=$(echo $obj | grep $prop || true)
+if [ "X$found" != "X" ]; then
+  #updatedentity=`echo $obj | jq -c '.'"$prop"' |= "'"$value"'" ' `
+  updatedentity=$(echo $obj | sed -e 's/[|]'"$prop"'=[^|]\+[|]/|'"$prop=$value"'|/')
+else
+  updatedentity=$(echo $obj | sed -e 's/"properties":"/"properties":"'"$prop=$value"'|/')
+fi
 echo $updatedentity
 echo
 
 echo "update the object in bluecat, expect null response"
-bam update method=put body="$updatedentity"
+#bam update method=put body="$updatedentity"
+response=$(curl -s -k -X PUT -H "$tokenheader" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  'https://'$server'/Services/REST/v1/update' \
+  -d "$updatedentity"\
+  -o /dev/null -w "%{http_code}\n"
+  )
+echo $response
 echo
 
 newobj=`curl -s -k -H "$tokenheader" 'https://'$server'/Services/REST/v1/getEntityById?id='$entity_id`
-echo $new_obj
+echo $newobj
