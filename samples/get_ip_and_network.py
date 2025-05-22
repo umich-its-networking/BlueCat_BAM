@@ -109,11 +109,12 @@ def get_ip_and_net(ip, conn, configuration_id):
     print(
         "".join(
             (
-                "network %s name %s ip %s name %s state %s ",
+                "id %s network %s name %s ip %s name %s state %s ",
                 "macAddress %s vendorClassIdentifier %s",
             )
         )
         % (
+            network_obj['id'],
             network_obj["properties"]["CIDR"],
             network_obj["name"],
             ip_obj["properties"]["address"],
